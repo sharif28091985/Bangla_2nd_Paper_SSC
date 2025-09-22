@@ -1,0 +1,1641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Full-Screen MCQ Quiz</title>
+<style>
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #1a1a1a;
+    font-family: Arial, sans-serif;
+    color: #fff;
+    overflow: hidden;
+}
+
+#quiz-container {
+    display: none;
+    width: 100%;
+    height: 100%;
+    position: relative;
+}
+
+.question {
+    text-align: center;
+    margin: 3% auto;
+    word-wrap: break-word;
+    font-weight: bold;
+}
+
+.options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 3%;
+    width: 85%;
+    height: 60%;
+    margin: 0 auto;
+}
+
+.option {
+    background-color: #333;
+    border: 2px solid #00ffff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold;
+    font-size: 4vw;
+    cursor: pointer;
+    text-align: center;
+    padding: 1%;
+    border-radius: 10px;
+    transition: 0.3s;
+}
+
+.option.correct { background-color: #00cc00; color: #000; }
+.option.wrong { background-color: #cc0000; color: #000; }
+
+.top-bar {
+    width: 100%;
+    height: 60px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 2%;
+    box-sizing: border-box;
+    font-size: 1.8vw;
+}
+
+.progress-container, .timer-container {
+    width: 35%;
+    background: #333;
+    border-radius: 25px;
+    overflow: hidden;
+}
+
+.progress-bar, .timer-bar {
+    height: 25px;
+    width: 0;
+    background-color: #00ffff;
+    transition: width 0.3s;
+}
+
+.score { color: #00ff00; }
+
+.control-buttons {
+    position: absolute;
+    top: 50%;
+    right: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.control-buttons button {
+    background-color: #333;
+    border: 2px solid #00ffff;
+    color: #fff;
+    font-weight: bold;
+    cursor: pointer;
+    border-radius: 10px;
+    transition: 0.3s;
+    padding: 10px 15px;
+    text-align: center;
+}
+
+#start-screen, #result-screen {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+    flex-direction: column;
+}
+
+#start-screen button, #result-screen button {
+    font-size: 3.5vw;
+    padding: 15px 30px;
+    cursor: pointer;
+    border-radius: 15px;
+    border: none;
+    background-color: #00ffff;
+    color: #000;
+    margin-top: 20px;
+}
+</style>
+</head>
+<body>
+
+<div id="start-screen">
+    <h1>Welcome to the Quiz!</h1>
+    <button onclick="startQuiz()">Start Quiz</button>
+</div>
+
+<div id="quiz-container">
+    <div class="top-bar">
+        <div>Q No: <span id="current-question">1</span> / <span id="total-questions"></span></div>
+        <div class="progress-container">
+            <div class="progress-bar" id="progress-bar"></div>
+        </div>
+        <div class="timer-container">
+            <div class="timer-bar" id="timer-bar"></div>
+        </div>
+        <div class="score" id="score">Score: 0</div>
+    </div>
+
+    <div class="question" id="question"></div>
+    <div class="options" id="options"></div>
+
+    <div class="control-buttons">
+        <button id="pause-btn" onclick="pauseQuiz()">Pause</button>
+        <button id="resume-btn" onclick="resumeQuiz()">Resume</button>
+        <button id="stop-btn" onclick="stopQuiz()">Stop</button>
+    </div>
+</div>
+
+<div id="result-screen">
+    <h1>Your Score: <span id="final-score"></span></h1>
+    <h2 id="wrong-summary"></h2>
+    <button onclick="retryWrong()">Retry Wrong Answers</button>
+    <button onclick="restartQuiz()">Restart Quiz</button>
+</div>
+
+<script>
+// JSON formatted questions
+const quizData = [
+  {
+    "id": 1,
+    "question": "যেসব শব্দের অর্থ অভিন্ন বা প্রায় সমান, সেসব শব্দকে কী বলে?",
+    "options": [
+      "প্রতিশব্দ",
+      "বাগধারা",
+      "সমাস",
+      "উপসর্গ"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 2,
+    "question": "'গৃহ' শব্দের প্রতিশব্দ কোনটি?",
+    "options": [
+      "ভবন",
+      "বাসা",
+      "বাড়ি",
+      "সবগুলি"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 3,
+    "question": "'নির্বাচন' শব্দের প্রতিশব্দ কোনটি?",
+    "options": [
+      "বাছাই",
+      "ভোট",
+      "নির্বাচন করা",
+      "কোনোটিই নয়"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 4,
+    "question": "'কথা' শব্দের প্রতিশব্দ কোনটি?",
+    "options": [
+      "গল্প",
+      "বাণী",
+      "ভাষণ",
+      "বচন"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 5,
+    "question": "'প্রতিশব্দ সব সময়ে প্রতিস্থাপনযোগ্য না-ও হতে পারে' — এর কারণ কী?",
+    "options": [
+      "অর্থের ভিন্নতা",
+      "প্রসঙ্গের উপর নির্ভরতা",
+      "শব্দের ভিন্নতা",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 6,
+    "question": "'অকস্মাৎ' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "আচমকা",
+      " সর্বদা",
+      "হঠাৎ",
+      "ক ও গ উভয়ই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 7,
+    "question": "'অকাল' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "সময়",
+      "অসময়",
+      "ভালো সময়",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 8,
+    "question": "'অক্ষয়' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "ক্ষয়হীন",
+      "ক্ষয়শীল",
+      "চিরস্থায়ী",
+      "ক ও গ উভয়ই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 9,
+    "question": "'অতিথি' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "মেহমান",
+      "অভ্যাগত",
+      "আগন্তুক",
+      "সবগুলি"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 10,
+    "question": "'অদ্ভুত' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "উদ্ভট",
+      "সুন্দর",
+      "স্বাভাবিক",
+      "কোনোটিই নয়"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 11,
+    "question": "'অনেক' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "কম",
+      "বেশি",
+      "সামান্য",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 12,
+    "question": "'অন্ধকার' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "আঁধার",
+      "আলো",
+      "তিমির",
+      "ক ও গ উভয়ই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 13,
+    "question": "'অবকাশ' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "সময়",
+      "অবসর",
+      "ছুটি",
+      "সবগুলি"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 14,
+    "question": "'অভাব' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "দারিদ্র্য",
+      "অনটন",
+      "প্রাচুর্য",
+      "ক ও খ উভয়ই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 15,
+    "question": "'অলস' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "কর্মঠ",
+      "আলসে",
+      "নিষ্ক্রিয়",
+      "খ ও গ উভয়ই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 16,
+    "question": "'অশ্ব' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "হাতি",
+      "ঘোড়া",
+      "গরু",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 17,
+    "question": "'আইন' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "বিধান",
+      "নিয়ম",
+      "কানুন",
+      "সবগুলি"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 18,
+    "question": "'আকাশ' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "গগন",
+      "আসমান",
+      "পৃথিবী",
+      "ক ও খ উভয়ই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 19,
+    "question": "'আগুন' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "অনল",
+      "পানি",
+      "বহ্নি",
+      "ক ও গ উভয়ই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 20,
+    "question": "'আনন্দ' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "দুঃখ",
+      "খুশি",
+      "বেদনা",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 21,
+    "question": "'ইচ্ছা' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "আকাঙ্ক্ষা",
+      "আশা",
+      "প্রার্থনা",
+      "সবগুলি"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 22,
+    "question": "'উত্তম' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "নিকৃষ্ট",
+      "ভালো",
+      "শ্রেষ্ঠ",
+      "খ ও গ উভয়ই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 23,
+    "question": "'একতা' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "ঐক্য",
+      "মিলন",
+      "একত্ব",
+      "সবগুলি"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 24,
+    "question": "'কঠিন' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "শক্ত",
+      "সহজ",
+      "কঠোর",
+      "ক ও গ উভয়ই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 25,
+    "question": "'কথা' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "উক্তি",
+      "বাক্য",
+      "বচন",
+      "সবগুলি"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 26,
+    "question": "'কন্যা' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "ছেলে",
+      "মেয়ে",
+      "পুত্রী",
+      "খ ও গ উভয়ই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 27,
+    "question": "'কপাল' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "ললাট",
+      "ভাগ্য",
+      "অদৃষ্ট",
+      "সবগুলি"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 28,
+    "question": "'কবুতর' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "কপোত",
+      "পায়রা",
+      "পারাবত",
+      "সবগুলি"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 29,
+    "question": "'কষ্ট' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "আনন্দ",
+      "দুঃখ",
+      "মেহনত",
+      "খ ও গ উভয়ই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 30,
+    "question": "'কান' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "কর্ণ",
+      "শ্রবণ",
+      "শ্রুতি",
+      "সবগুলি"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 31,
+    "question": "'কান্না' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "হাসি",
+      "ক্রন্দন",
+      "রোদন",
+      "খ ও গ উভয়ই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 32,
+    "question": "'কিরণ' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "রশ্মি",
+      "আলো",
+      "অন্ধকার",
+      "ক ও খ উভয়ই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 33,
+    "question": "'কুল' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "বংশ",
+      "গোত্র",
+      "গোষ্ঠী",
+      "সবগুলি"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 34,
+    "question": "'কূল' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "নদী",
+      "তীর",
+      "ঢেউ",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 35,
+    "question": "'খবর' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "সংবাদ",
+      "বার্তা",
+      "তথ্য",
+      "সবগুলি"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 36,
+    "question": "'খাদ্য' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "খাবার",
+      "খানা",
+      "ভোজ্য",
+      "সবগুলি"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 37,
+    "question": "'খারাপ' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "ভালো",
+      "মন্দ",
+      "দুষ্ট",
+      "খ ও গ উভয়ই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 38,
+    "question": "'খোঁজ' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "সন্ধান",
+      "অন্বেষণ",
+      "খোঁজখবর",
+      "সবগুলি"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 39,
+    "question": "'গভীর' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "অগাধ",
+      "অগভীর",
+      "অত",
+      "ক ও গ উভয়ই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 40,
+    "question": "'গৃহ' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "বাড়ি",
+      "ঘর",
+      "ভবন",
+      "সবগুলি"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 41,
+    "question": "'চাঁদ' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "সূর্য",
+      "চন্দ্র",
+      "শশী",
+      "খ ও গ উভয়ই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 42,
+    "question": "'চুল' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "চুল",
+      "কেশ",
+      "অলক",
+      "খ ও গ উভয়ই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 43,
+    "question": "'চোখ' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "চক্ষু",
+      "নয়ন",
+      "আঁখি",
+      "সবগুলি"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 44,
+    "question": "'জন্ম' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "মৃত্যু",
+      "উৎপত্তি",
+      "উদ্ভব",
+      "খ ও গ উভয়ই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 45,
+    "question": "'ঝড়' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "ঝঞ্ঝা",
+      "তুফান",
+      "ঘূর্ণিঝড়",
+      "সবগুলি"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 46,
+    "question": "'ঝোঁক' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "টান",
+      "প্রবণতা",
+      "আকর্ষণ",
+      "সবগুলি"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 47,
+    "question": "'ঠিক' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "যথাযথ",
+      "সত্য",
+      "সঠিক",
+      "সবগুলি"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 48,
+    "question": "'ঠাট্টা' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "বিদ্রুপ",
+      "মশকরা",
+      "রসিকতা",
+      "সবগুলি"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 49,
+    "question": "'ঢেউ' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "তরজা",
+      "কল্লোল",
+      "উর্মি",
+      "সবগুলি"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 50,
+    "question": "'তৃষ্ণা' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "পিপাসা",
+      "তিয়াসা",
+      "তেষ্টা",
+      "সবগুলি"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 51,
+    "question": "'তৈরি' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "গঠন",
+      "নির্মাণ",
+      "বানানো",
+      "সবগুলি"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 52,
+    "question": "'দয়া' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "অনুগ্রহ",
+      "করুণা",
+      "কৃপা",
+      "সবগুলি"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 53,
+    "question": "'দলিল' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "নথি",
+      "কাগজপত্র",
+      "দস্তাবেজ",
+      "সবগুলি"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 54,
+    "question": "'দিন' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "রাত",
+      "দিবস",
+      "দিবা",
+      "খ ও গ উভয়ই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 55,
+    "question": "'দেহ' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "শরীর",
+      "গা",
+      "অঙ্গ",
+      "সবগুলি"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 56,
+    "question": "'নতুন' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "নবীন",
+      "পুরাতন",
+      "আধুনিক",
+      "ক ও গ উভয়ই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 57,
+    "question": "'নদী' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "সাগর",
+      "গাঙ",
+      "স্রোতস্বিনী",
+      "খ ও গ উভয়ই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 58,
+    "question": "'নারী' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "পুরুষ",
+      "মানবী",
+      "মহিলা",
+      "খ ও গ উভয়ই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 59,
+    "question": "'নিত্য' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "সর্বদা",
+      "রোজ",
+      "চিরস্থায়ী",
+      "সবগুলি"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 60,
+    "question": "'পদ্ম' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "কমল",
+      "শাপলা",
+      "পঙ্কজ",
+      "ক ও গ উভয়ই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 61,
+    "question": "'পর্বত' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "পাহাড়",
+      "সমতল",
+      "গিরি",
+      "ক ও গ উভয়ই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 62,
+    "question": "'পাখি' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "পক্ষী",
+      "বিহগ",
+      "খগ",
+      "সবগুলি"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 63,
+    "question": "'পাথর' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "প্রস্তর",
+      "মাটি",
+      "শিলা",
+      "ক ও গ উভয়ই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 64,
+    "question": "'পানি' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "জল",
+      "অগ্নি",
+      "সলিল",
+      "ক ও গ উভয়ই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 65,
+    "question": "'পুত্র' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "কন্যা",
+      "ছেলে",
+      "আত্মজ",
+      "খ ও গ উভয়ই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 66,
+    "question": "'পৃথিবী' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "আকাশ",
+      "জগৎ",
+      "ধরা",
+      "খ ও গ উভয়ই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 67,
+    "question": "'বন' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "অরণ্য",
+      "জঙ্গল",
+      "কানন",
+      "সবগুলি"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 68,
+    "question": "'বাতাস' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "বায়ু",
+      "পবন",
+      "আগুন",
+      "ক ও খ উভয়ই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 69,
+    "question": "'বিদ্যুৎ' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "তড়িৎ",
+      "বিজলি",
+      "আলো",
+      "ক ও খ উভয়ই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 70,
+    "question": "'বিবাহ' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "বিয়ে",
+      "বিচ্ছেদ",
+      "পরিণয়",
+      "ক ও গ উভয়ই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 71,
+    "question": "'বৃক্ষ' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "গাছ",
+      "তরু",
+      "লতা",
+      "ক ও খ উভয়ই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 72,
+    "question": "'ব্যবধান' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "ফাঁক",
+      "ছিদ্র",
+      "পার্থক্য",
+      "সবগুলি"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 73,
+    "question": "'মন' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "অন্তর",
+      "চিত্ত",
+      "হৃদয়",
+      "সবগুলি"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 74,
+    "question": "'মা' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "পিতা",
+      "জননী",
+      "মাতা",
+      "খ ও গ উভয়ই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 75,
+    "question": "'মৃত্যু' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "জীবন",
+      "মরণ",
+      "বিনাশ",
+      "খ ও গ উভয়ই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 76,
+    "question": "'মেঘ' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "জলদ",
+      "জলধর",
+      "আকাশ",
+      "ক ও খ উভয়ই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 77,
+    "question": "'যুদ্ধ' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "লড়াই",
+      "শান্তি",
+      "সংঘর্ষ",
+      "ক ও গ উভয়ই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 78,
+    "question": "'রাজা' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "প্রজা",
+      "নৃপতি",
+      "সম্রাট",
+      "খ ও গ উভয়ই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 79,
+    "question": "'রাত' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "দিন",
+      "রাত্রি",
+      "রজনী",
+      "খ ও গ উভয়ই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 80,
+    "question": "'রানি' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "রাজা",
+      "মহিষী",
+      "সম্রাজ্ঞী",
+      "খ ও গ উভয়ই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 81,
+    "question": "'সমুদ্র' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "সাগর",
+      "নদী",
+      "সিন্ধু",
+      "ক ও গ উভয়ই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 82,
+    "question": "'সাপ' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "সর্প",
+      "ফণী",
+      "বাঘ",
+      "ক ও খ উভয়ই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 83,
+    "question": "'সিংহ' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "বাঘ",
+      "কেশরীর",
+      "পশুরাজ",
+      "খ ও গ উভয়ই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 84,
+    "question": "'সুন্দর' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "খারাপ",
+      "মনোরম",
+      "মনোহর",
+      "খ ও গ উভয়ই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 85,
+    "question": "'সূর্য' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "চন্দ্র",
+      "রবি",
+      "তপন",
+      "খ ও গ উভয়ই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 86,
+    "question": "'স্ত্রী' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "পুরুষ",
+      "পত্নী",
+      "ভার্যা",
+      "খ ও গ উভয়ই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 87,
+    "question": "'স্বর্ণ' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "রূপা",
+      "সোনা",
+      "সুবর্ণ",
+      "খ ও গ উভয়ই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 88,
+    "question": "'স্বামী' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "স্ত্রী",
+      "পতি",
+      "কান্ত",
+      "খ ও গ উভয়ই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 89,
+    "question": "'হাত' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "হস্ত",
+      "পা",
+      "কর",
+      "ক ও গ উভয়ই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 90,
+    "question": "'হাতি' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "গজ",
+      "অশ্ব",
+      "হস্তী",
+      "ক ও গ উভয়ই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 91,
+    "question": "'হীন' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "নীচ",
+      "উন্নত",
+      "অধম",
+      "ক ও গ উভয়ই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 92,
+    "question": "বাক্যের প্রকাশকে সাবলীল করতে কী প্রয়োজন?",
+    "options": [
+      "প্রতিশব্দ",
+      "বাগধারা",
+      "প্রবাদ",
+      "কোনোটিই নয়"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 93,
+    "question": "'গৃহহীন' শব্দের পরিবর্তে 'ভবনহীন' বলা যায় না কেন?",
+    "options": [
+      "অর্থের ভিন্নতা",
+      "প্রসঙ্গের ভিন্নতা",
+      "শব্দের ভিন্নতা",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 94,
+    "question": "'নির্বাচন কমিশন'-কে 'বাছাই কমিশন' বলা যায় না কেন?",
+    "options": [
+      "অর্থের ভিন্নতা",
+      "প্রসঙ্গের ভিন্নতা",
+      "শব্দের ভিন্নতা",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 95,
+    "question": "বক্তার মুখে 'কথার খই ফোটে' বলা গেলেও 'বাণীর খই ফোটে' বলা যায় না কেন?",
+    "options": [
+      "অর্থের ভিন্নতা",
+      "প্রসঙ্গের ভিন্নতা",
+      "শব্দের ভিন্নতা",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 96,
+    "question": "'অকস্মাৎ' শব্দের একটি প্রতিশব্দ কী?",
+    "options": [
+      "সহসা",
+      "নিয়মিত",
+      "সবসময়",
+      "কোনোটিই নয়"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 97,
+    "question": "'অন্ধকার' শব্দের একটি প্রতিশব্দ কী?",
+    "options": [
+      "আলো",
+      "আঁধার",
+      "সকাল",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 98,
+    "question": "'আকাশ' শব্দের একটি প্রতিশব্দ কী?",
+    "options": [
+      "অম্বর",
+      "ব্যোম",
+      "নভ",
+      "সবগুলি"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 99,
+    "question": "'আগুন' শব্দের একটি প্রতিশব্দ কী?",
+    "options": [
+      "জল",
+      "অনল",
+      "বাতাস",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 100,
+    "question": "'পুত্র' শব্দের একটি প্রতিশব্দ কী?",
+    "options": [
+      "তনয়",
+      "কন্যা",
+      "দুহিতা",
+      "কোনোটিই নয়"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 101,
+    "question": "'রাত' শব্দের একটি প্রতিশব্দ কী?",
+    "options": [
+      "দিন",
+      "রজনী",
+      "সকাল",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 102,
+    "question": "'সূর্য' শব্দের একটি প্রতিশব্দ কী?",
+    "options": [
+      "চন্দ্র",
+      "রবি",
+      "তারা",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 103,
+    "question": "'হাত' শব্দের একটি প্রতিশব্দ কী?",
+    "options": [
+      "পা",
+      "হস্ত",
+      "মাথা",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 104,
+    "question": "'হাতি' শব্দের একটি প্রতিশব্দ কী?",
+    "options": [
+      "ঘোড়া",
+      "গজ",
+      "গরু",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 105,
+    "question": "'যুদ্ধ' শব্দের একটি প্রতিশব্দ কী?",
+    "options": [
+      "শান্তি",
+      "লড়াই",
+      "সন্ধি",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 106,
+    "question": "'নদী' শব্দের একটি প্রতিশব্দ কী?",
+    "options": [
+      "সাগর",
+      "তটিনী",
+      "ঝর্ণা",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 107,
+    "question": "'বন' শব্দের একটি প্রতিশব্দ কী?",
+    "options": [
+      "অরণ্য",
+      "বাগান",
+      "মাঠ",
+      "কোনোটিই নয়"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 108,
+    "question": "'মা' শব্দের একটি প্রতিশব্দ কী?",
+    "options": [
+      "পিতা",
+      "জননী",
+      "ভাই",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 109,
+    "question": "'সিংহ' শব্দের একটি প্রতিশব্দ কী?",
+    "options": [
+      "কেশরীর",
+      "বাঘ",
+      "হরিণ",
+      "কোনোটিই নয়"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 110,
+    "question": "'সুন্দর' শব্দের একটি প্রতিশব্দ কী?",
+    "options": [
+      "খারাপ",
+      "কুৎসিত",
+      "মনোরম",
+      "কোনোটিই নয়"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 111,
+    "question": "'স্বামী' শব্দের একটি প্রতিশব্দ কী?",
+    "options": [
+      "স্ত্রী",
+      "পতি",
+      "বন্ধু",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 112,
+    "question": "'নিত্য' শব্দের একটি প্রতিশব্দ কী?",
+    "options": [
+      "মাঝে মাঝে",
+      "সর্বদা",
+      "কখনও কখনও",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 113,
+    "question": "'জল' শব্দের একটি প্রতিশব্দ কী?",
+    "options": [
+      "অগ্নি",
+      "পানি",
+      "বায়ু",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 114,
+    "question": "'খাদ্য' শব্দের একটি প্রতিশব্দ কী?",
+    "options": [
+      "খাবার",
+      "পানীয়",
+      "ফল",
+      "কোনোটিই নয়"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 115,
+    "question": "'অলস' শব্দের একটি প্রতিশব্দ কী?",
+    "options": [
+      "শ্রমবিমুখ",
+      "কর্মঠ",
+      "সক্রিয়",
+      "কোনোটিই নয়"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 116,
+    "question": "'বাণী' শব্দের প্রতিশব্দ কী?",
+    "options": [
+      "কথা",
+      "বাক্য",
+      "শব্দ",
+      "সবগুলি"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 117,
+    "question": "'গৃহ' এবং 'বাড়ি' কি ধরনের শব্দ?",
+    "options": [
+      "বিপরীত শব্দ",
+      "প্রতিশব্দ",
+      "সমার্থক শব্দ",
+      "ক ও খ উভয়ই"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 118,
+    "question": "'অকস্মাৎ', 'হঠাৎ', 'সহসা' —এই শব্দগুলো কিসের উদাহরণ?",
+    "options": [
+      "বিপরীত শব্দের",
+      "প্রতিশব্দের",
+      "সমাসবদ্ধ পদের",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 119,
+    "question": "বাক্যের অর্থকে সুস্পষ্ট করতে কী প্রয়োজন?",
+    "options": [
+      "বাগধারা",
+      "প্রবাদ",
+      "যথাযথ প্রতিশব্দ",
+      "কোনোটিই নয়"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 120,
+    "question": "'শব্দ' এবং 'প্রতিশব্দ' এর মধ্যে সম্পর্ক কী?",
+    "options": [
+      "শব্দের প্রতিশব্দ থাকে",
+      "প্রতিশব্দের শব্দ থাকে",
+      "উভয়ই এক",
+      "কোনোটিই নয়"
+    ],
+    "answer": 0
+  }
+];
+
+let currentQuestion = 0;
+let score = 0;
+let wrongAnswers = [];
+let timer;
+let timeLeft = 30;
+let paused = false;
+
+const questionEl = document.getElementById("question");
+const optionsEl = document.getElementById("options");
+const progressBar = document.getElementById("progress-bar");
+const timerBar = document.getElementById("timer-bar");
+const scoreEl = document.getElementById("score");
+const currentQuestionEl = document.getElementById("current-question");
+const totalQuestionsEl = document.getElementById("total-questions");
+const quizContainer = document.getElementById("quiz-container");
+const startScreen = document.getElementById("start-screen");
+const resultScreen = document.getElementById("result-screen");
+const finalScore = document.getElementById("final-score");
+const wrongSummary = document.getElementById("wrong-summary");
+
+totalQuestionsEl.innerText = quizData.length;
+
+function startQuiz() {
+    startScreen.style.display = "none";
+    quizContainer.style.display = "block";
+    currentQuestion = 0;
+    score = 0;
+    wrongAnswers = [];
+    updateScore();
+    showQuestion();
+    openFullscreen();
+}
+
+function showQuestion() {
+    if (currentQuestion >= quizData.length) {
+        endQuiz();
+        return;
+    }
+
+    timeLeft = 30;
+    updateTimer();
+    startTimer();
+
+    const q = quizData[currentQuestion];
+    questionEl.innerText = `${q.id}. ${q.question}`; // Show serial from JSON
+    adjustFontSize(questionEl, q.question, 6);
+
+    optionsEl.innerHTML = "";
+    q.options.forEach((option, index) => {
+        const btn = document.createElement("div");
+        btn.classList.add("option");
+        btn.innerText = option;
+        adjustFontSize(btn, option, 4);
+        btn.addEventListener("click", () => selectAnswer(index));
+        optionsEl.appendChild(btn);
+    });
+
+    currentQuestionEl.innerText = currentQuestion + 1;
+    progressBar.style.width = ((currentQuestion / quizData.length) * 100) + "%";
+}
+
+// Dynamic font adjustment
+function adjustFontSize(el, text, maxSize) {
+    let size = maxSize - Math.floor(text.length / 25);
+    if (size < 3) size = 3;
+    el.style.fontSize = size + "vw";
+}
+
+function selectAnswer(index) {
+    stopTimer();
+    const q = quizData[currentQuestion];
+    const optionEls = document.querySelectorAll(".option");
+
+    if (index === q.answer) {
+        optionEls[index].classList.add("correct");
+        score++;
+    } else {
+        optionEls[index].classList.add("wrong");
+        optionEls[q.answer].classList.add("correct");
+        wrongAnswers.push(q);
+    }
+
+    updateScore();
+    setTimeout(() => {
+        currentQuestion++;
+        showQuestion();
+    }, 1000);
+}
+
+function updateScore() { scoreEl.innerText = `Score: ${score}`; }
+
+function startTimer() {
+    timerBar.style.width = "100%";
+    timer = setInterval(() => {
+        if (!paused) {
+            timeLeft--;
+            timerBar.style.width = (timeLeft / 30 * 100) + "%";
+            if (timeLeft <= 0) {
+                stopTimer();
+                wrongAnswers.push(quizData[currentQuestion]);
+                currentQuestion++;
+                showQuestion();
+            }
+        }
+    }, 1000);
+}
+
+function stopTimer() { clearInterval(timer); }
+function updateTimer() { timerBar.style.width = "100%"; }
+function pauseQuiz() { paused = true; }
+function resumeQuiz() { paused = false; }
+function stopQuiz() { stopTimer(); endQuiz(); }
+
+function endQuiz() {
+    quizContainer.style.display = "none";
+    resultScreen.style.display = "flex";
+    finalScore.innerText = `${score} / ${quizData.length}`;
+    if(wrongAnswers.length > 0){
+        wrongSummary.innerText = `Wrong Answers: ${wrongAnswers.length} / ${quizData.length}`;
+    } else {
+        wrongSummary.innerText = "";
+    }
+}
+
+function restartQuiz() {
+    resultScreen.style.display = "none";
+    startScreen.style.display = "flex";
+}
+
+function retryWrong() {
+    if (wrongAnswers.length === 0) return;
+    quizData.splice(0, quizData.length, ...wrongAnswers);
+    resultScreen.style.display = "none";
+    quizContainer.style.display = "block";
+    currentQuestion = 0;
+    score = 0;
+    wrongAnswers = [];
+    updateScore();
+    showQuestion();
+}
+
+function openFullscreen() {
+    const elem = document.documentElement;
+    if (elem.requestFullscreen) { elem.requestFullscreen(); }
+    else if (elem.webkitRequestFullscreen) { elem.webkitRequestFullscreen(); }
+    else if (elem.msRequestFullscreen) { elem.msRequestFullscreen(); }
+}
+</script>
+
+</body>
+</html>

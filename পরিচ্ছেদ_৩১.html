@@ -1,0 +1,1421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Full-Screen MCQ Quiz</title>
+<style>
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #1a1a1a;
+    font-family: Arial, sans-serif;
+    color: #fff;
+    overflow: hidden;
+}
+
+#quiz-container {
+    display: none;
+    width: 100%;
+    height: 100%;
+    position: relative;
+}
+
+.question {
+    text-align: center;
+    margin: 3% auto;
+    word-wrap: break-word;
+    font-weight: bold;
+}
+
+.options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 3%;
+    width: 85%;
+    height: 60%;
+    margin: 0 auto;
+}
+
+.option {
+    background-color: #333;
+    border: 2px solid #00ffff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold;
+    font-size: 4vw;
+    cursor: pointer;
+    text-align: center;
+    padding: 1%;
+    border-radius: 10px;
+    transition: 0.3s;
+}
+
+.option.correct { background-color: #00cc00; color: #000; }
+.option.wrong { background-color: #cc0000; color: #000; }
+
+.top-bar {
+    width: 100%;
+    height: 60px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 2%;
+    box-sizing: border-box;
+    font-size: 1.8vw;
+}
+
+.progress-container, .timer-container {
+    width: 35%;
+    background: #333;
+    border-radius: 25px;
+    overflow: hidden;
+}
+
+.progress-bar, .timer-bar {
+    height: 25px;
+    width: 0;
+    background-color: #00ffff;
+    transition: width 0.3s;
+}
+
+.score { color: #00ff00; }
+
+.control-buttons {
+    position: absolute;
+    top: 50%;
+    right: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.control-buttons button {
+    background-color: #333;
+    border: 2px solid #00ffff;
+    color: #fff;
+    font-weight: bold;
+    cursor: pointer;
+    border-radius: 10px;
+    transition: 0.3s;
+    padding: 10px 15px;
+    text-align: center;
+}
+
+#start-screen, #result-screen {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+    flex-direction: column;
+}
+
+#start-screen button, #result-screen button {
+    font-size: 3.5vw;
+    padding: 15px 30px;
+    cursor: pointer;
+    border-radius: 15px;
+    border: none;
+    background-color: #00ffff;
+    color: #000;
+    margin-top: 20px;
+}
+</style>
+</head>
+<body>
+
+<div id="start-screen">
+    <h1>Welcome to the Quiz!</h1>
+    <button onclick="startQuiz()">Start Quiz</button>
+</div>
+
+<div id="quiz-container">
+    <div class="top-bar">
+        <div>Q No: <span id="current-question">1</span> / <span id="total-questions"></span></div>
+        <div class="progress-container">
+            <div class="progress-bar" id="progress-bar"></div>
+        </div>
+        <div class="timer-container">
+            <div class="timer-bar" id="timer-bar"></div>
+        </div>
+        <div class="score" id="score">Score: 0</div>
+    </div>
+
+    <div class="question" id="question"></div>
+    <div class="options" id="options"></div>
+
+    <div class="control-buttons">
+        <button id="pause-btn" onclick="pauseQuiz()">Pause</button>
+        <button id="resume-btn" onclick="resumeQuiz()">Resume</button>
+        <button id="stop-btn" onclick="stopQuiz()">Stop</button>
+    </div>
+</div>
+
+<div id="result-screen">
+    <h1>Your Score: <span id="final-score"></span></h1>
+    <h2 id="wrong-summary"></h2>
+    <button onclick="retryWrong()">Retry Wrong Answers</button>
+    <button onclick="restartQuiz()">Restart Quiz</button>
+</div>
+
+<script>
+// JSON formatted questions
+const quizData = [
+  {
+    "id": 1,
+    "question": "এক বা একাধিক শব্দ দিয়ে গঠিত পূর্ণ অর্থবোধক ভাষিক একককে কী বলে?",
+    "options": [
+      "শব্দ",
+      "পদ",
+      "বাক্য",
+      "বর্গ"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 2,
+    "question": "বাক্যের মধ্যে স্থান পাওয়া প্রত্যেকটি শব্দকে কী বলে?",
+    "options": [
+      "পদ",
+      "বর্গ",
+      "যোজক",
+      "ক্রিয়া"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 3,
+    "question": "'সজল ও লতা বই পড়ে।' — এই বাক্যে 'সজল' ও 'লতা' হলো কী?",
+    "options": [
+      "ক্রিয়া",
+      "বিশেষ্য",
+      "যোজক",
+      "বর্গ"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 4,
+    "question": "বাক্যের মধ্যে একাধিক শব্দের গুচ্ছ অনেক সময়ে কীসের মতো কাজ করে?",
+    "options": [
+      "পদের",
+      "ক্রিয়ার",
+      "বর্গের",
+      "যোজকের"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 5,
+    "question": "'সজল ও লতা বই পড়ে।' — এই বাক্যে 'সজল ও লতা' কী?",
+    "options": [
+      "বর্গ",
+      "যোজক",
+      "ক্রিয়া",
+      "কর্ম"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 6,
+    "question": "সাধারণ বাক্যের প্রধান তিনটি অংশ কী কী?",
+    "options": [
+      "উদ্দেশ্য,বিধেয়,ক্রিয়া",
+      "কর্তা, কর্ম, ক্রিয়া",
+      "কর্তা, কর্ম, বিধেয়",
+      "উদ্দেশ্য,কর্ম, ক্রিয়া"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 7,
+    "question": "বাক্যের ক্রিয়াকে যে চালায়, তাকে কী বলে?",
+    "options": [
+      "কর্ম",
+      "কর্তা",
+      "বিধেয়",
+      "উদ্দেশ্য"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 8,
+    "question": "যাকে অবলম্বন করে ক্রিয়া সম্পাদিত হয়, তাকে কী বলে?",
+    "options": [
+      "কর্তা",
+      "কর্ম",
+      "বিধেয়",
+      "উদ্দেশ্য"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 9,
+    "question": "বাক্যের মধ্যে যে অংশ দিয়ে কোনো কিছু করা, ঘটা বা হওয়া বোঝায়, তাকে কী বলে?",
+    "options": [
+      "কর্তা",
+      "কর্ম",
+      "ক্রিয়া",
+      "বিধেয়"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 10,
+    "question": "'সজল ও লতা বই পড়ে।' — এই বাক্যে কর্তা কে বা কারা?",
+    "options": [
+      "সজল",
+      "লতা",
+      "সজল ও লতা",
+      "বই"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 11,
+    "question": "'সজল ও লতা বই পড়ে।' — এই বাক্যে কর্ম কোনটি?",
+    "options": [
+      "সজল",
+      "লতা",
+      "বই",
+      "পড়ে"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 12,
+    "question": "'সজল ও লতা বই পড়ে।' — এই বাক্যে ক্রিয়া কোনটি?",
+    "options": [
+      "সজল",
+      "লতা",
+      "বই",
+      "পড়ে"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 13,
+    "question": "প্রতিটি বাক্যকে প্রধানত কয় ভাগে ভাগ করা যায়?",
+    "options": [
+      "দুই",
+      "তিন",
+      "চার",
+      "পাঁচ"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 14,
+    "question": "বাক্যের যে অংশে কারো সম্পর্কে বলা হয়, সেই অংশকে কী বলে?",
+    "options": [
+      "বিধেয়",
+      "উদ্দেশ্য",
+      "কর্তা",
+      "কর্ম"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 15,
+    "question": "বাক্যের যে অংশে উদ্দেশ্য সম্পর্কে কিছু বলা হয়, সেই অংশকে কী বলে?",
+    "options": [
+      "উদ্দেশ্য",
+      "কর্তা",
+      "বিধেয়",
+      "কর্ম"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 16,
+    "question": "'সজল ও লতা বই পড়ে।' — এই বাক্যে উদ্দেশ্য কোনটি?",
+    "options": [
+      "সজল ও লতা",
+      "বই পড়ে",
+      "বই",
+      "পড়ে"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 17,
+    "question": "'সজল ও লতা বই পড়ে।' — এই বাক্যে বিধেয় কোনটি?",
+    "options": [
+      "সজল ও লতা",
+      "বই পড়ে",
+      "বই",
+      "পড়ে"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 18,
+    "question": "গঠনগত দিক দিয়ে বাক্যকে কয় ভাগে ভাগ করা যায়?",
+    "options": [
+      "দুই",
+      "তিন",
+      "চার",
+      "পাঁচ"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 19,
+    "question": "একটিমাত্র সমাপিকা ক্রিয়া থাকলে তাকে কী বাক্য বলে?",
+    "options": [
+      "যৌগিক বাক্য",
+      "জটিল বাক্য",
+      "সরল বাক্য",
+      "সক্রিয় বাক্য"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 20,
+    "question": "'জেসমিন সবার জন্য চা বানিয়েছে।' — এটি কোন ধরনের বাক্য?",
+    "options": [
+      "জটিল বাক্য",
+      "যৌগিক বাক্য",
+      "সরল বাক্য",
+      "বিবৃতিবাচক বাক্য"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 21,
+    "question": "একটি মূল বাক্যের অধীনে এক বা একাধিক আশ্রিত বাক্য বা বাক্যাংশ থাকলে কী বাক্য তৈরি হয়?",
+    "options": [
+      "সরল বাক্য",
+      "যৌগিক বাক্য",
+      "জটিল বাক্য",
+      "সক্রিয় বাক্য"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 22,
+    "question": "'যদি তোমার কিছু বলার থাকে, তবে এখনই বলে ফেলো।' — এটি কোন ধরনের বাক্য?",
+    "options": [
+      "সরল বাক্য",
+      "যৌগিক বাক্য",
+      "জটিল বাক্য",
+      "সক্রিয় বাক্য"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 23,
+    "question": "এক বা একাধিক বাক্য বা বাক্যাংশ যোজকের মাধ্যমে যুক্ত হয়ে কী বাক্য গঠন করে?",
+    "options": [
+      "সরল বাক্য",
+      "যৌগিক বাক্য",
+      "জটিল বাক্য",
+      "সক্রিয় বাক্য"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 24,
+    "question": "'রহমত রাতে রুটি খায় আর রহিমা খায় ভাত।' — এটি কোন ধরনের বাক্য?",
+    "options": [
+      "সরল বাক্য",
+      "জটিল বাক্য",
+      "যৌগিক বাক্য",
+      "বিবৃতিবাচক বাক্য"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 25,
+    "question": "যেসব বাক্যের বিধেয় অংশে ক্রিয়া থাকে, সেগুলোকে কী বলে?",
+    "options": [
+      "অক্রিয় বাক্য",
+      "সক্রিয় বাক্য",
+      "সরল বাক্য",
+      "যৌগিক বাক্য"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 26,
+    "question": "'আমার মা চাকরি করেন।' — এটি কোন ধরনের বাক্য?",
+    "options": [
+      "অক্রিয় বাক্য",
+      "সক্রিয় বাক্য",
+      "সরল বাক্য",
+      "বিবৃতিবাচক বাক্য"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 27,
+    "question": "যেসব বাক্যের বিধেয় অংশে ক্রিয়া থাকে না, সেগুলোকে কী বলে?",
+    "options": [
+      "সক্রিয় বাক্য",
+      "অক্রিয় বাক্য",
+      "সরল বাক্য",
+      "জটিল বাক্য"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 28,
+    "question": "'তিনি বাংলাদেশের নাগরিক।' — এটি কোন ধরনের বাক্য?",
+    "options": [
+      "সক্রিয় বাক্য",
+      "অক্রিয় বাক্য",
+      "সরল বাক্য",
+      "যৌগিক বাক্য"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 29,
+    "question": "'তিনি বাংলাদেশের নাগরিক ছিলেন' — এটি কোন ধরনের বাক্য?",
+    "options": [
+      "অক্রিয় বাক্য",
+      "সক্রিয় বাক্য",
+      "সরল বাক্য",
+      "যৌগিক বাক্য"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 30,
+    "question": "বক্তবের লক্ষ্য অনুযায়ী বাক্যকে কয় ভাগে ভাগ করা যায়?",
+    "options": [
+      "তিন",
+      "চার",
+      "পাঁচ",
+      "ছয়"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 31,
+    "question": "সাধারণভাবে কোনো বিবরণ প্রকাশ পায় যেসব বাক্যে, সেগুলোকে কী বলে?",
+    "options": [
+      "প্রশ্নবাচক বাক্য",
+      "বিবৃতিবাচক বাক্য",
+      "অনুজ্ঞাবাচক বাক্য",
+      "আবেগবাচক বাক্য"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 32,
+    "question": "'আমরা রোজ বেড়াতে যেতাম।' — এটি কোন ধরনের বাক্য?",
+    "options": [
+      "প্রশ্নবাচক বাক্য",
+      "বিবৃতিবাচক বাক্য",
+      "অনুজ্ঞাবাচক বাক্য",
+      "আবেগবাচক বাক্য"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 33,
+    "question": "বক্তা কারও কাছ থেকে কিছু জানার জন্য যে ধরনের বাক্য বলে, সেগুলো কী?",
+    "options": [
+      "বিবৃতিবাচক বাক্য",
+      "প্রশ্নবাচক বাক্য",
+      "অনুজ্ঞাবাচক বাক্য",
+      "আবেগবাচক বাক্য"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 34,
+    "question": "'তোমার নাম কী?' — এটি কোন ধরনের বাক্য?",
+    "options": [
+      "বিবৃতিবাচক বাক্য",
+      "প্রশ্নবাচক বাক্য",
+      "অনুজ্ঞাবাচক বাক্য",
+      "আবেগবাচক বাক্য"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 35,
+    "question": "আদেশ, নিষেধ, অনুরোধ, প্রার্থনা ইত্যাদি বোঝাতে কোন ধরনের বাক্য হয়?",
+    "options": [
+      "বিবৃতিবাচক বাক্য",
+      "প্রশ্নবাচক বাক্য",
+      "অনুজ্ঞাবাচক বাক্য",
+      "আবেগবাচক বাক্য"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 36,
+    "question": "'আমাকে একটি কলম দাও।' — এটি কোন ধরনের বাক্য?",
+    "options": [
+      "প্রশ্নবাচক বাক্য",
+      "অনুজ্ঞাবাচক বাক্য",
+      "আবেগবাচক বাক্য",
+      "বিবৃতিবাচক বাক্য"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 37,
+    "question": "কোনো কিছু দেখে বা শুনে অবাক হয়ে যে ধরনের বাক্য তৈরি হয়, তাকে কী বলে?",
+    "options": [
+      "বিবৃতিবাচক বাক্য",
+      "প্রশ্নবাচক বাক্য",
+      "অনুজ্ঞাবাচক বাক্য",
+      "আবেগবাচক বাক্য"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 38,
+    "question": "'দারুণ! আমরা জিতে গিয়েছি।' — এটি কোন ধরনের বাক্য?",
+    "options": [
+      "বিবৃতিবাচক বাক্য",
+      "প্রশ্নবাচক বাক্য",
+      "অনুজ্ঞাবাচক বাক্য",
+      "আবেগবাচক বাক্য"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 39,
+    "question": "'অত উঁচু পাহাড়ে উঠে আমি তো ভয়েই মরি!' — এটি কোন ধরনের বাক্য?",
+    "options": [
+      "বিবৃতিবাচক বাক্য",
+      "প্রশ্নবাচক বাক্য",
+      "অনুজ্ঞাবাচক বাক্য",
+      "আবেগবাচক বাক্য"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 40,
+    "question": "বাক্যের উদ্দেশ্য ও বিধেয় এই দুই অংশ কীসের ভিত্তিতে বিভক্ত হয়?",
+    "options": [
+      "গঠনগত দিক",
+      "বিধেয় অংশে ক্রিয়া থাকা না থাকা",
+      "বক্তার মনের ভাব",
+      "বক্তবের লক্ষ্য"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 41,
+    "question": "'সজল ও লতা বই পড়ে।' — এই বাক্যে 'ও' হলো কী?",
+    "options": [
+      "বিশেষ্য",
+      "যোজক",
+      "ক্রিয়া",
+      "সর্বনাম"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 42,
+    "question": "'আমার মা চাকরি করেন।' — এই বাক্যের বিধেয় অংশে কী আছে?",
+    "options": [
+      "কর্তা",
+      "কর্ম",
+      "ক্রিয়া",
+      "উদ্দেশ্য"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 43,
+    "question": "'তিনি বাংলাদেশের নাগরিক।' — এই বাক্যের বিধেয় অংশে কী নেই?",
+    "options": [
+      "কর্তা",
+      "কর্ম",
+      "ক্রিয়া",
+      "উদ্দেশ্য"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 44,
+    "question": "'তিনি বাংলাদেশের নাগরিক হবেন' — এই বাক্যটি কেন সক্রিয় বাক্য?",
+    "options": [
+      "এতে কর্তা আছে।",
+      "এতে কর্ম আছে।",
+      "এতে ভবিষ্যৎ কালের ক্রিয়া আছে।",
+      "এটি একটি সরল বাক্য।"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 45,
+    "question": "'আমরা রোজ বেড়াতে যেতাম।' — এটি কোন ধরনের বিবৃতিবাচক বাক্য?",
+    "options": [
+      "ইতিবাচক",
+      "নেতিবাচক",
+      "প্রশ্নবাচক",
+      "আবেগবাচক"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 46,
+    "question": "'তারা তোমাদের ভোলেনি।' — এটি কোন ধরনের বিবৃতিবাচক বাক্য?",
+    "options": [
+      "ইতিবাচক",
+      "নেতিবাচক",
+      "প্রশ্নবাচক",
+      "আবেগবাচক"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 47,
+    "question": "'সুন্দরবনকে কোন ধরনের বনাঞ্চল বলা হয়?' — এটি কেন প্রশ্নবাচক বাক্য?",
+    "options": [
+      "এতে আবেগ প্রকাশ পায়।",
+      "এতে আদেশ প্রকাশ পায়।",
+      "এতে কিছু জানার আগ্রহ প্রকাশ পায়।",
+      "এতে কোনো বিবরণ প্রকাশ পায়।"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 48,
+    "question": "'আমাকে একটি কলম দাও।' — এটি কেন অনুজ্ঞাবাচক বাক্য?",
+    "options": [
+      "এটিতে আদেশ প্রকাশ পায়।",
+      "এটিতে অনুরোধ প্রকাশ পায়।",
+      "এটিতে প্রার্থনা প্রকাশ পায়।",
+      "এটিতে সবগুলিই প্রকাশ পেতে পারে।"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 49,
+    "question": "'তার মঙ্গল হোক।' — এটি কোন ধরনের অনুজ্ঞাবাচক বাক্য?",
+    "options": [
+      "আদেশ",
+      "নিষেধ",
+      "অনুরোধ",
+      "প্রার্থনা"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 50,
+    "question": "'দারুণ! আমরা জিতে গিয়েছি।' — এটি কেন আবেগবাচক বাক্য?",
+    "options": [
+      "এতে বিস্ময় প্রকাশ পায়।",
+      "এতে আনন্দ প্রকাশ পায়।",
+      "এতে ভয় প্রকাশ পায়।",
+      "এতে সবগুলিই প্রকাশ পেতে পারে।"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 51,
+    "question": "'অত উঁচু পাহাড়ে উঠে আমি তো ভয়েই মরি!' — এই বাক্যে কোন আবেগ প্রকাশ পেয়েছে?",
+    "options": [
+      "আনন্দ",
+      "ভয়",
+      "ঘৃণা",
+      "বিরক্তি"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 52,
+    "question": "'সজল ও লতা বই পড়ে।' বাক্যটিতে কয়টি শব্দ আছে?",
+    "options": [
+      "চারটি",
+      "পাঁচটি",
+      "ছয়টি",
+      "সাতটি"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 53,
+    "question": "'সজল ও লতা বই পড়ে।' বাক্যটিতে কয়টি পদ আছে?",
+    "options": [
+      "চারটি",
+      "পাঁচটি",
+      "ছয়টি",
+      "সাতটি"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 54,
+    "question": "'সজল ও লতা' এই বর্গটি বাক্যের কোন অংশ হিসেবে কাজ করেছে?",
+    "options": [
+      "বিধেয়",
+      "কর্ম",
+      "কর্তা",
+      "ক্রিয়া"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 55,
+    "question": "একটি বাক্য দিয়ে কী প্রকাশ হয়?",
+    "options": [
+      "বক্তার মনের ভাব",
+      "শব্দের অর্থ",
+      "পদের বিভাজন",
+      "বর্গের গঠন"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 56,
+    "question": "'রূপতত্ত্ব' অংশে কী উপস্থাপন করা হয়েছে?",
+    "options": [
+      "বাক্য বিভাজন",
+      "পদ বিভাজন",
+      "বর্গ বিভাজন",
+      "শব্দ বিভাজন"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 57,
+    "question": "'যদি তোমার কিছু বলার থাকে, তবে এখনই বলে ফেলো।' — এই বাক্যে 'যদি' ও 'তবে' কী হিসেবে ব্যবহৃত হয়েছে?",
+    "options": [
+      "যোজক",
+      "অনুসর্গ",
+      "বিভক্তি",
+      "ক্রিয়া"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 58,
+    "question": "'রহমত রাতে রুটি খায় আর রহিমা খায় ভাত।' — এই বাক্যে 'আর' কী?",
+    "options": [
+      "অনুসর্গ",
+      "যোজক",
+      "ক্রিয়া",
+      "বিশেষণ"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 59,
+    "question": "'আমার মা চাকরি করেন।' — এই বাক্যটি কেন 'সক্রিয় বাক্য' হিসেবে পরিচিত?",
+    "options": [
+      "কারণ এতে একটিমাত্র সমাপিকা ক্রিয়া আছে।",
+      "কারণ এতে বিধেয় অংশে ক্রিয়া আছে।",
+      "কারণ এতে কর্তা আছে।",
+      "কারণ এতে কর্ম আছে।"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 60,
+    "question": "'তিনি বাংলাদেশের নাগরিক ছিলেন' — এই বাক্যের ক্রিয়া কোনটি?",
+    "options": [
+      "তিনি",
+      "বাংলাদেশের",
+      "নাগরিক",
+      "ছিলেন"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 61,
+    "question": "'তোমার নাম কী?' — এই বাক্যটি কোন ধরনের বাক্যের উদাহরণ?",
+    "options": [
+      "বিবৃতিবাচক",
+      "প্রশ্নবাচক",
+      "অনুজ্ঞাবাচক",
+      "আবেগবাচক"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 62,
+    "question": "'আমাকে একটি কলম দাও।' — এটি কী প্রকাশ করছে?",
+    "options": [
+      "আদেশ",
+      "অনুরোধ",
+      "প্রার্থনা",
+      "সবগুলি"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 63,
+    "question": "'দারুণ! আমরা জিতে গিয়েছি।' — এই বাক্যে 'দারুণ!' শব্দটি কী প্রকাশ করছে?",
+    "options": [
+      "ভয়",
+      "আনন্দ",
+      "ঘৃণা",
+      "বিরক্তি"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 64,
+    "question": "'বাক্যের অংশ ও শ্রেণিবিভাগ' কোন ব্যাকরণ অংশের আলোচ্য বিষয়?",
+    "options": [
+      "রূপতত্ত্ব",
+      "ধ্বনিতত্ত্ব",
+      "বাক্যতত্ত্ব",
+      "অর্থতত্ত্ব"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 65,
+    "question": "'বক্তব্যের লক্ষ্য অনুযায়ী' বাক্যকে কয় ভাগে ভাগ করা যায়?",
+    "options": [
+      "৪",
+      "৫",
+      "৬",
+      "৭"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 66,
+    "question": "'বিবৃতিমূলক বাক্য' কয় ধরনের হতে পারে?",
+    "options": [
+      "১",
+      "২",
+      "৩",
+      "৪"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 67,
+    "question": "'তারা তোমাদের ভোলেনি।' — এটি একটি নেতিবাচক বিবৃতিবাচক বাক্য। এটি কেন নেতিবাচক?",
+    "options": [
+      "এতে 'ভোলেনি' শব্দটি আছে।",
+      "এতে 'তোমাদের' শব্দটি আছে।",
+      "এতে 'তারা' শব্দটি আছে।",
+      "কোনোটিই নয়।"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 68,
+    "question": "'সুন্দরবনকে কোন ধরনের বনাঞ্চল বলা হয়?' — এই বাক্যটি কেন প্রশ্নবাচক?",
+    "options": [
+      "এটিতে একটি প্রশ্নবোধক শব্দ আছে।",
+      "এটিতে একটি প্রশ্নবোধক চিহ্ন আছে।",
+      "এটিতে কিছু জানার আগ্রহ প্রকাশ পায়।",
+      "সবগুলি"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 69,
+    "question": "'তার মঙ্গল হোক।' — এই বাক্যের মাধ্যমে কী প্রকাশ করা হয়েছে?",
+    "options": [
+      "আদেশ",
+      "উপদেশ",
+      "নিষেধ",
+      "প্রার্থনা"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 70,
+    "question": "'অত উঁচু পাহাড়ে উঠে আমি তো ভয়েই মরি!' — এই বাক্যের মূল ভাব কী?",
+    "options": [
+      "ভয়",
+      "আনন্দ",
+      "ঘৃণা",
+      "বিস্ময়"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 71,
+    "question": "একটি সরল বাক্য চেনার প্রধান উপায় কী?",
+    "options": [
+      "এতে একটিমাত্র সমাপিকা ক্রিয়া থাকবে।",
+      "এতে একটি মূল ও একটি আশ্রিত বাক্য থাকবে।",
+      "এতে একটি যোজক থাকবে।",
+      "এতে দুটি সমাপিকা ক্রিয়া থাকবে।"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 72,
+    "question": "একটি জটিল বাক্য চেনার প্রধান উপায় কী?",
+    "options": [
+      "এতে একটিমাত্র সমাপিকা ক্রিয়া থাকবে।",
+      "এতে একটি মূল ও এক বা একাধিক আশ্রিত বাক্য থাকবে।",
+      "এতে একটি যোজক থাকবে।",
+      "এতে দুটি স্বাধীন বাক্য থাকবে।"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 73,
+    "question": "একটি যৌগিক বাক্য চেনার প্রধান উপায় কী?",
+    "options": [
+      "এতে একটিমাত্র সমাপিকা ক্রিয়া থাকবে।",
+      "এতে এক বা একাধিক বাক্য যোজকের মাধ্যমে যুক্ত থাকবে।",
+      "এতে একটি মূল বাক্য থাকবে।",
+      "এতে কোনো যোজক থাকবে না।"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 74,
+    "question": "'যৌগিক বাক্য' গঠনের জন্য কীসের প্রয়োজন হয়?",
+    "options": [
+      "একটি সমাপিকা ক্রিয়ার",
+      "একটি আশ্রিত বাক্যের",
+      "একটি যোজকের",
+      "কোনোটিই নয়"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 75,
+    "question": "'অক্রিয় বাক্য' কী কারণে 'সক্রিয় বাক্য' হয়ে যায়?",
+    "options": [
+      "কর্মের প্রয়োগে",
+      "কর্তার প্রয়োগে",
+      "অতীত বা ভবিষ্যৎ কালের প্রয়োগে",
+      "কোনোটিই নয়"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 76,
+    "question": "'বক্তব্যের লক্ষ্য অনুযায়ী' বাক্য বিভাজন কোন বিষয়কে গুরুত্ব দেয়?",
+    "options": [
+      "বাক্যের গঠনকে",
+      "বাক্যের ক্রিয়াকে",
+      "বাক্যের উদ্দেশ্যকে",
+      "বাক্যের অর্থ ও ভাবকে"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 77,
+    "question": "'আবেগবাচক বাক্য' এর প্রধান বৈশিষ্ট্য কী?",
+    "options": [
+      "এটি প্রশ্ন করে।",
+      "এটি আদেশ দেয়।",
+      "এটি বক্তার বিস্ময় বা অনুভূতি প্রকাশ করে।",
+      "এটি সাধারণ বিবরণ দেয়।"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 78,
+    "question": "'অনুজ্ঞাবাচক বাক্য' এর প্রধান বৈশিষ্ট্য কী?",
+    "options": [
+      "এটি কোনো তথ্য দেয়।",
+      "এটি কোনো কাজ করার জন্য অনুরোধ করে।",
+      "এটি কোনো প্রশ্ন করে।",
+      "এটি কোনো অনুভূতি প্রকাশ করে।"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 79,
+    "question": "'প্রশ্নবাচক বাক্য' এর প্রধান বৈশিষ্ট্য কী?",
+    "options": [
+      "এটি কিছু জানতে চায়।",
+      "এটি কোনো আদেশ দেয়।",
+      "এটি কোনো অনুভূতি প্রকাশ করে।",
+      "এটি কোনো বিবরণ দেয়।"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 80,
+    "question": "'বিবৃতিবাচক বাক্য' এর প্রধান বৈশিষ্ট্য কী?",
+    "options": [
+      "এটি কোনো প্রশ্ন করে।",
+      "এটি কোনো আদেশ দেয়।",
+      "এটি কোনো অনুভূতি প্রকাশ করে।",
+      "এটি কোনো বিবরণ প্রকাশ করে।"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 81,
+    "question": "'সক্রিয় বাক্য' এর প্রধান বৈশিষ্ট্য কী?",
+    "options": [
+      "এর বিধেয় অংশে ক্রিয়া থাকে।",
+      "এর বিধেয় অংশে ক্রিয়া থাকে না।",
+      "এটিতে যোজক থাকে।",
+      "এটিতে একটিমাত্র ক্রিয়া থাকে।"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 82,
+    "question": "'অক্রিয় বাক্য' এর প্রধান বৈশিষ্ট্য কী?",
+    "options": [
+      "এর বিধেয় অংশে ক্রিয়া থাকে।",
+      "এর বিধেয় অংশে ক্রিয়া থাকে না।",
+      "এটিতে কর্তা থাকে।",
+      "এটিতে কর্ম থাকে।"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 83,
+    "question": "'সজল ও লতা বই পড়ে।' — এই বাক্যে কয়টি পদ রয়েছে?",
+    "options": [
+      "৩টি",
+      "৪টি",
+      "৫টি",
+      "৬টি"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 84,
+    "question": "'সজল ও লতা' এই গুচ্ছটিকে কেন বর্গ বলা হয়?",
+    "options": [
+      "কারণ এতে একাধিক শব্দ রয়েছে।",
+      "কারণ এটি একটি পদের মতো কাজ করে।",
+      "কারণ এতে একটি যোজক রয়েছে।",
+      "সবগুলি"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 85,
+    "question": "একটি সরল বাক্যে কী কী অংশ থাকতে পারে?",
+    "options": [
+      "কর্তা ও ক্রিয়া",
+      "কর্তা, কর্ম ও ক্রিয়া",
+      "উদ্দেশ্য ও বিধেয়",
+      "সবগুলি"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 86,
+    "question": "'যদি তোমার কিছু বলার থাকে' — এই অংশটি কোন বাক্যের অধীনে থাকে?",
+    "options": [
+      "সরল বাক্য",
+      "যৌগিক বাক্য",
+      "জটিল বাক্য",
+      "সক্রিয় বাক্য"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 87,
+    "question": "'তবে এখনই বলে ফেলো।' — এই অংশটি কী?",
+    "options": [
+      "মূল বাক্য",
+      "আশ্রিত বাক্য",
+      "বিধেয়",
+      "উদ্দেশ্য"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 88,
+    "question": "'রহমত রাতে রুটি খায়' — এই অংশটি কোন বাক্যের অংশ?",
+    "options": [
+      "সরল বাক্য",
+      "জটিল বাক্য",
+      "যৌগিক বাক্য",
+      "সবগুলি"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 89,
+    "question": "'রহিমা খায় ভাত' — এই অংশটি কোন বাক্যের অংশ?",
+    "options": [
+      "সরল বাক্য",
+      "জটিল বাক্য",
+      "যৌগিক বাক্য",
+      "সবগুলি"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 90,
+    "question": "'আমার মা চাকরি করেন।' — এই বাক্যটি কেন বিবৃতিবাচক?",
+    "options": [
+      "কারণ এটি একটি আদেশ।",
+      "কারণ এটি একটি প্রশ্ন।",
+      "কারণ এটি একটি বিবরণ প্রকাশ করে।",
+      "কারণ এটি একটি আবেগ প্রকাশ করে।"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 91,
+    "question": "'তার মঙ্গল হোক।' — এই বাক্যে 'হোক' শব্দটি কোন ধরনের ক্রিয়া?",
+    "options": [
+      "আদেশ",
+      "নিষেধ",
+      "প্রার্থনা",
+      "অনুরোধ"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 92,
+    "question": "'অত উঁচু পাহাড়ে উঠে আমি তো ভয়েই মরি!' — এই বাক্যের মূলভাব কীসের সঙ্গে সম্পর্কিত?",
+    "options": [
+      "আবেগ",
+      "যোজক",
+      "অনুসর্গ",
+      "ক্রিয়া"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 93,
+    "question": "'সজল ও লতা বই পড়ে।' বাক্যটিতে 'ও' যোজকটি কী কী যুক্ত করেছে?",
+    "options": [
+      "দুটি বাক্য",
+      "দুটি পদ",
+      "দুটি বর্গ",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 94,
+    "question": "'বাক্য' এর মূল ভিত্তি কী?",
+    "options": [
+      "শব্দ",
+      "পদ",
+      "অক্ষর",
+      "বর্ণ"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 95,
+    "question": "'যদি তোমার কিছু বলার থাকে' — এই বাক্যাংশটি কী?",
+    "options": [
+      "মূল বাক্য",
+      "আশ্রিত বাক্য",
+      "সরল বাক্য",
+      "বিধেয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 96,
+    "question": "'রহমত রাতে রুটি খায় আর রহিমা খায় ভাত।' — এই বাক্যে কয়টি স্বাধীন বাক্য রয়েছে?",
+    "options": [
+      "একটি",
+      "দুইটি",
+      "তিনটি",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 97,
+    "question": "'তিনি বাংলাদেশের নাগরিক ছিলেন' — এই বাক্যটি কেন সক্রিয় বাক্য?",
+    "options": [
+      "এটিতে একটি ক্রিয়া আছে",
+      "এটিতে একটি বিধেয় আছে",
+      "এটিতে একটি উদ্দেশ্য আছে",
+      "এটিতে একটি কর্ম আছে"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 98,
+    "question": "'আমরা রোজ বেড়াতে যেতাম।' — এটি কোন ধরনের বাক্য?",
+    "options": [
+      "সরল ও বিবৃতিবাচক",
+      "জটিল ও বিবৃতিবাচক",
+      "যৌগিক ও বিবৃতিবাচক",
+      "আবেগবাচক ও সরল"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 99,
+    "question": "'দারুণ! আমরা জিতে গিয়েছি।' — এই বাক্যটি কোন ধরনের বাক্য?",
+    "options": [
+      "সরল ও আবেগবাচক",
+      "জটিল ও আবেগবাচক",
+      "যৌগিক ও আবেগবাচক",
+      "বিবৃতিবাচক ও আবেগবাচক"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 100,
+    "question": "'রহমত রাতে রুটি খায় আর রহিমা খায় ভাত।' — এই বাক্যটি কোন ধরনের বাক্য?",
+    "options": [
+      "সরল ও যৌগিক",
+      "জটিল ও যৌগিক",
+      "যৌগিক ও বিবৃতিবাচক",
+      "সরল ও বিবৃতিবাচক"
+    ],
+    "answer": 2
+  }
+];
+
+let currentQuestion = 0;
+let score = 0;
+let wrongAnswers = [];
+let timer;
+let timeLeft = 30;
+let paused = false;
+
+const questionEl = document.getElementById("question");
+const optionsEl = document.getElementById("options");
+const progressBar = document.getElementById("progress-bar");
+const timerBar = document.getElementById("timer-bar");
+const scoreEl = document.getElementById("score");
+const currentQuestionEl = document.getElementById("current-question");
+const totalQuestionsEl = document.getElementById("total-questions");
+const quizContainer = document.getElementById("quiz-container");
+const startScreen = document.getElementById("start-screen");
+const resultScreen = document.getElementById("result-screen");
+const finalScore = document.getElementById("final-score");
+const wrongSummary = document.getElementById("wrong-summary");
+
+totalQuestionsEl.innerText = quizData.length;
+
+function startQuiz() {
+    startScreen.style.display = "none";
+    quizContainer.style.display = "block";
+    currentQuestion = 0;
+    score = 0;
+    wrongAnswers = [];
+    updateScore();
+    showQuestion();
+    openFullscreen();
+}
+
+function showQuestion() {
+    if (currentQuestion >= quizData.length) {
+        endQuiz();
+        return;
+    }
+
+    timeLeft = 30;
+    updateTimer();
+    startTimer();
+
+    const q = quizData[currentQuestion];
+    questionEl.innerText = `${q.id}. ${q.question}`; // Show serial from JSON
+    adjustFontSize(questionEl, q.question, 6);
+
+    optionsEl.innerHTML = "";
+    q.options.forEach((option, index) => {
+        const btn = document.createElement("div");
+        btn.classList.add("option");
+        btn.innerText = option;
+        adjustFontSize(btn, option, 4);
+        btn.addEventListener("click", () => selectAnswer(index));
+        optionsEl.appendChild(btn);
+    });
+
+    currentQuestionEl.innerText = currentQuestion + 1;
+    progressBar.style.width = ((currentQuestion / quizData.length) * 100) + "%";
+}
+
+// Dynamic font adjustment
+function adjustFontSize(el, text, maxSize) {
+    let size = maxSize - Math.floor(text.length / 25);
+    if (size < 3) size = 3;
+    el.style.fontSize = size + "vw";
+}
+
+function selectAnswer(index) {
+    stopTimer();
+    const q = quizData[currentQuestion];
+    const optionEls = document.querySelectorAll(".option");
+
+    if (index === q.answer) {
+        optionEls[index].classList.add("correct");
+        score++;
+    } else {
+        optionEls[index].classList.add("wrong");
+        optionEls[q.answer].classList.add("correct");
+        wrongAnswers.push(q);
+    }
+
+    updateScore();
+    setTimeout(() => {
+        currentQuestion++;
+        showQuestion();
+    }, 1000);
+}
+
+function updateScore() { scoreEl.innerText = `Score: ${score}`; }
+
+function startTimer() {
+    timerBar.style.width = "100%";
+    timer = setInterval(() => {
+        if (!paused) {
+            timeLeft--;
+            timerBar.style.width = (timeLeft / 30 * 100) + "%";
+            if (timeLeft <= 0) {
+                stopTimer();
+                wrongAnswers.push(quizData[currentQuestion]);
+                currentQuestion++;
+                showQuestion();
+            }
+        }
+    }, 1000);
+}
+
+function stopTimer() { clearInterval(timer); }
+function updateTimer() { timerBar.style.width = "100%"; }
+function pauseQuiz() { paused = true; }
+function resumeQuiz() { paused = false; }
+function stopQuiz() { stopTimer(); endQuiz(); }
+
+function endQuiz() {
+    quizContainer.style.display = "none";
+    resultScreen.style.display = "flex";
+    finalScore.innerText = `${score} / ${quizData.length}`;
+    if(wrongAnswers.length > 0){
+        wrongSummary.innerText = `Wrong Answers: ${wrongAnswers.length} / ${quizData.length}`;
+    } else {
+        wrongSummary.innerText = "";
+    }
+}
+
+function restartQuiz() {
+    resultScreen.style.display = "none";
+    startScreen.style.display = "flex";
+}
+
+function retryWrong() {
+    if (wrongAnswers.length === 0) return;
+    quizData.splice(0, quizData.length, ...wrongAnswers);
+    resultScreen.style.display = "none";
+    quizContainer.style.display = "block";
+    currentQuestion = 0;
+    score = 0;
+    wrongAnswers = [];
+    updateScore();
+    showQuestion();
+}
+
+function openFullscreen() {
+    const elem = document.documentElement;
+    if (elem.requestFullscreen) { elem.requestFullscreen(); }
+    else if (elem.webkitRequestFullscreen) { elem.webkitRequestFullscreen(); }
+    else if (elem.msRequestFullscreen) { elem.msRequestFullscreen(); }
+}
+</script>
+
+</body>
+</html>

@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Full-Screen MCQ Quiz</title>
+<style>
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #1a1a1a;
+    font-family: Arial, sans-serif;
+    color: #fff;
+    overflow: hidden;
+}
+
+#quiz-container {
+    display: none;
+    width: 100%;
+    height: 100%;
+    position: relative;
+}
+
+.question {
+    text-align: center;
+    margin: 3% auto;
+    word-wrap: break-word;
+    font-weight: bold;
+}
+
+.options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 3%;
+    width: 85%;
+    height: 60%;
+    margin: 0 auto;
+}
+
+.option {
+    background-color: #333;
+    border: 2px solid #00ffff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold;
+    font-size: 4vw;
+    cursor: pointer;
+    text-align: center;
+    padding: 1%;
+    border-radius: 10px;
+    transition: 0.3s;
+}
+
+.option.correct { background-color: #00cc00; color: #000; }
+.option.wrong { background-color: #cc0000; color: #000; }
+
+.top-bar {
+    width: 100%;
+    height: 60px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 2%;
+    box-sizing: border-box;
+    font-size: 1.8vw;
+}
+
+.progress-container, .timer-container {
+    width: 35%;
+    background: #333;
+    border-radius: 25px;
+    overflow: hidden;
+}
+
+.progress-bar, .timer-bar {
+    height: 25px;
+    width: 0;
+    background-color: #00ffff;
+    transition: width 0.3s;
+}
+
+.score { color: #00ff00; }
+
+.control-buttons {
+    position: absolute;
+    top: 50%;
+    right: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.control-buttons button {
+    background-color: #333;
+    border: 2px solid #00ffff;
+    color: #fff;
+    font-weight: bold;
+    cursor: pointer;
+    border-radius: 10px;
+    transition: 0.3s;
+    padding: 10px 15px;
+    text-align: center;
+}
+
+#start-screen, #result-screen {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+    flex-direction: column;
+}
+
+#start-screen button, #result-screen button {
+    font-size: 3.5vw;
+    padding: 15px 30px;
+    cursor: pointer;
+    border-radius: 15px;
+    border: none;
+    background-color: #00ffff;
+    color: #000;
+    margin-top: 20px;
+}
+</style>
+</head>
+<body>
+
+<div id="start-screen">
+    <h1>Welcome to the Quiz!</h1>
+    <button onclick="startQuiz()">Start Quiz</button>
+</div>
+
+<div id="quiz-container">
+    <div class="top-bar">
+        <div>Q No: <span id="current-question">1</span> / <span id="total-questions"></span></div>
+        <div class="progress-container">
+            <div class="progress-bar" id="progress-bar"></div>
+        </div>
+        <div class="timer-container">
+            <div class="timer-bar" id="timer-bar"></div>
+        </div>
+        <div class="score" id="score">Score: 0</div>
+    </div>
+
+    <div class="question" id="question"></div>
+    <div class="options" id="options"></div>
+
+    <div class="control-buttons">
+        <button id="pause-btn" onclick="pauseQuiz()">Pause</button>
+        <button id="resume-btn" onclick="resumeQuiz()">Resume</button>
+        <button id="stop-btn" onclick="stopQuiz()">Stop</button>
+    </div>
+</div>
+
+<div id="result-screen">
+    <h1>Your Score: <span id="final-score"></span></h1>
+    <h2 id="wrong-summary"></h2>
+    <button onclick="retryWrong()">Retry Wrong Answers</button>
+    <button onclick="restartQuiz()">Restart Quiz</button>
+</div>
+
+<script>
+// JSON formatted questions
+const quizData = [
+  {
+    "id": 1,
+    "question": "বাংলা ভাষায় কয়টি মূল ধ্বনিকে প্রকাশ করার জন্য ৫০টি মূল বর্ণ রয়েছে?",
+    "options": [
+      "৩৭টি",
+      "৪২টি",
+      "৪৪টি",
+      "৫০টি"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 2,
+    "question": "অধিকাংশ বর্ণের উচ্চারণ কী ধরনের?",
+    "options": [
+      "মূল ধ্বনির অনুরূপ",
+      "ভিন্ন",
+      "একাধিক",
+      "অপরিবর্তিত"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 3,
+    "question": "ধ্বনিগুলো দিয়ে শব্দ তৈরির সময় কীসের প্রভাবে বর্ণের উচ্চারণ বদলে যায়?",
+    "options": [
+      "শব্দের আকারের প্রভাবে",
+      "পাশের ধ্বনির প্রভাবে",
+      "অক্ষরের সংখ্যার প্রভাবে",
+      "অক্ষরের অবস্থানের প্রভাবে"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 4,
+    "question": "অ বর্ণের উচ্চারণ কত রকম?",
+    "options": [
+      "এক",
+      "দুই",
+      "তিন",
+      "চার"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 5,
+    "question": "'অনাথ' শব্দের 'অ' এর উচ্চারণ কেমন?",
+    "options": [
+      "[ও]",
+      "[আ]",
+      "স্বাভাবিক [অ]",
+      "[অ্যা]"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 6,
+    "question": "'অতি' শব্দের 'অ' এর উচ্চারণ কেমন?",
+    "options": [
+      "[অ]",
+      "[ও]",
+      "[আ]",
+      "[অ্যা]"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 7,
+    "question": "'পক্ষ' শব্দে 'অ' এর উচ্চারণ কী?",
+    "options": [
+      "[অ]",
+      "[ও]",
+      "[আ]",
+      "[অ্যা]"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 8,
+    "question": "আ বর্ণের স্বাভাবিক উচ্চারণ কেমন?",
+    "options": [
+      "[আ]",
+      "[অ্যা]",
+      "[এ]",
+      "[ও]"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 9,
+    "question": "কোন বর্ণের সঙ্গে যুক্ত থাকলে 'আ' বর্ণের উচ্চারণ [অ্যা]-এর মতো হয়?",
+    "options": [
+      "ক",
+      "ব",
+      "জ্ঞ",
+      "ম"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 10,
+    "question": "'জ্ঞান' শব্দের সঠিক উচ্চারণ কোনটি?",
+    "options": [
+      "[জ্ঞান]",
+      "[গ্যান]",
+      "[জ্ঞ্যান]",
+      "[গিয়ান]"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 11,
+    "question": "বাংলা ভাষায় ই এবং ঈ উভয় বর্ণের উচ্চারণ কেমন?",
+    "options": [
+      "ভিন্ন",
+      "একই রকম",
+      "একটি হ্রস্ব, অন্যটি দীর্ঘ",
+      "একটি দীর্ঘ, অন্যটি হ্রস্ব"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 12,
+    "question": "'দিন' এবং 'দীন' শব্দের উচ্চারণ কি অভিন্ন?",
+    "options": [
+      "হ্যাঁ, অভিন্ন",
+      "না, ভিন্ন",
+      "একটি হ্রস্ব, অন্যটি দীর্ঘ",
+      "একটি দীর্ঘ, অন্যটি হ্রস্ব"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 13,
+    "question": "'বীণা' শব্দের উচ্চারণ কেমন?",
+    "options": [
+      "[বিনা]",
+      "[বিনা]",
+      "[বীনা]",
+      "[বিনো]"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 14,
+    "question": "বাংলা ভাষায় উ এবং ঊ উভয় বর্ণের উচ্চারণ কেমন?",
+    "options": [
+      "ভিন্ন",
+      "একই রকম",
+      "একটি হ্রস্ব, অন্যটি দীর্ঘ",
+      "একটি দীর্ঘ, অন্যটি হ্রস্ব"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 15,
+    "question": "'উচিত' এবং 'ঊষা' শব্দ দুটির প্রথম বর্ণের উচ্চারণ কি একই রকম?",
+    "options": [
+      "হ্যাঁ, একই রকম",
+      "না, ভিন্ন রকম",
+      "একটি হ্রস্ব, অন্যটি দীর্ঘ",
+      "বলা সম্ভব নয়"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 16,
+    "question": "ঋ বর্ণের উচ্চারণ কেমন?",
+    "options": [
+      "[ঋ]",
+      "[রি]-এর মতো",
+      "[র]",
+      "[র্যা]"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 17,
+    "question": "'ঋতু' শব্দের উচ্চারণ কেমন?",
+    "options": [
+      "[ঋতু]",
+      "[রিতু]",
+      "[রু]",
+      "[রুতু]"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 18,
+    "question": "এ বর্ণের উচ্চারণ কত রকম?",
+    "options": [
+      "এক",
+      "দুই",
+      "তিন",
+      "চার"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 19,
+    "question": "'বেলা' শব্দের 'এ' এর উচ্চারণ কেমন?",
+    "options": [
+      "[এ]",
+      "[অ্যা]",
+      "[আ]",
+      "[ই]"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 20,
+    "question": "'একটি' শব্দের 'এ' এর উচ্চারণ কেমন?",
+    "options": [
+      "[এ]",
+      "[অ্যা]",
+      "[আ]",
+      "[ই]"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 21,
+    "question": "'ঐ' বর্ণের উচ্চারণ কেমন?",
+    "options": [
+      "[অই]",
+      "[ওই]",
+      "[ওউ]",
+      "[আয়]"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 22,
+    "question": "'ঔ' বর্ণের উচ্চারণ কেমন?",
+    "options": [
+      "[ওউ]",
+      "[আউ]",
+      "[ওউও]",
+      "[আও]"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 23,
+    "question": "'ঔষধ' শব্দের সঠিক উচ্চারণ কোনটি?",
+    "options": [
+      "[ওষোধ]",
+      "[ঔশধ]",
+      "[ওউশষ]",
+      "[ওষোধ]"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 24,
+    "question": "কোন ব্যঞ্জনবর্ণের নিজস্ব কোনো ধ্বনি নেই?",
+    "options": [
+      "ঞ",
+      "ণ",
+      "য",
+      "ব"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 25,
+    "question": "'চঞ্চল' শব্দে 'ঞ'-এর উচ্চারণ কেমন?",
+    "options": [
+      "[অ]",
+      "[ন]",
+      "[ইঁ]",
+      "[চ]"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 26,
+    "question": "'কণা' শব্দে 'ণ'-এর উচ্চারণ কেমন?",
+    "options": [
+      "[ন]",
+      "[ণ]",
+      "[ট]",
+      "[ড]"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 27,
+    "question": "শব্দের আদিতে ব-ফলার উচ্চারণ কেমন হয়?",
+    "options": [
+      "দ্বিত্ব হয়",
+      "লোপ পায়",
+      "ম-এর মতো হয়",
+      "অনুনাসিক হয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 28,
+    "question": "'ত্বক' শব্দে ব-ফলার উচ্চারণ কেমন?",
+    "options": [
+      "[তক]",
+      "[ত্বক]",
+      "[ত্তক]",
+      "[তুক]"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 29,
+    "question": "শব্দের মধ্যে বা শেষে ব-ফলা যুক্ত হলে সেই ব্যঞ্জনের উচ্চারণ কেমন হয়?",
+    "options": [
+      "দ্বিত্ব হয়",
+      "লোপ পায়",
+      "ব-এর উচ্চারণ বজায় থাকে",
+      "অনুনাসিক হয়"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 30,
+    "question": "'অশ্ব' শব্দের সঠিক উচ্চারণ কোনটি?",
+    "options": [
+      "[অশো]",
+      "[অশ্শো]",
+      "[অশশ্বো]",
+      "[অশ্বা]"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 31,
+    "question": "শব্দের প্রথম বর্ণে ম-ফলা থাকলে সেই বর্ণ উচ্চারণের সময়ে ম-এর উচ্চারণ কেমন হয়?",
+    "options": [
+      "দ্বিত্ব হয়",
+      "ম-এর উচ্চারণ বজায় থাকে",
+      "[আঁ]-এর মতো হয়",
+      "অনুনাসিক হয়"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 32,
+    "question": "'শশ্মশান' শব্দে ম-ফলার উচ্চারণ কেমন হয়?",
+    "options": [
+      "[শশান]",
+      "[শশ্মশান]",
+      "[শাশান]",
+      "[শমান]"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 33,
+    "question": "শব্দের মধ্যে ম-ফলা থাকলে সেই বর্ণ উচ্চারণে কী ঘটে?",
+    "options": [
+      "দ্বিত্ব হয় এবং সামান্য অনুনাসিক হয়",
+      "দ্বিত্ব হয় না",
+      "অনুনাসিক হয় না",
+      "স্বাভাবিক উচ্চারণ বজায় থাকে"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 34,
+    "question": "'পদ্ম' শব্দের সঠিক উচ্চারণ কোনটি?",
+    "options": [
+      "[পদ্ম]",
+      "[পোদদো]",
+      "[পদদো]",
+      "[পদোঁ]"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 35,
+    "question": "কোন ক্ষেত্রে ম-ফলায় ম-এর উচ্চারণ বজায় থাকে?",
+    "options": [
+      "যুগ্ম",
+      "পদ্ম",
+      "আত্মীয়",
+      "শশ্মশান"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 36,
+    "question": "'যদি' শব্দের য-এর উচ্চারণ কেমন?",
+    "options": [
+      "[জ]",
+      "[ঝ]",
+      "[য]",
+      "[দ]"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 37,
+    "question": "য-ফলা থাকলে স্বরের উচ্চারণে কী পরিবর্তন হয়?",
+    "options": [
+      "পরিবর্তন হয় না",
+      "স্বর দীর্ঘ হয়",
+      "স্বর বদলে যায়",
+      "স্বর অনুনাসিক হয়"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 38,
+    "question": "'ব্যথা' শব্দে 'ব' এর উচ্চারণ কেমন হয়?",
+    "options": [
+      "[বে]",
+      "[ব্যা]",
+      "[ব]",
+      "[বা]"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 39,
+    "question": "শব্দের মাঝখানে বা শেষে য-ফলা বর্ণের সঙ্গে যুক্ত থাকলে ঐ বর্ণের উচ্চারণ কী হয়?",
+    "options": [
+      "দ্বিত্ব হয়",
+      "লোপ পায়",
+      "অনুনাসিক হয়",
+      "র-এর মতো হয়"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 40,
+    "question": "'গদ্য' শব্দের সঠিক উচ্চারণ কোনটি?",
+    "options": [
+      "[গদো]",
+      "[গদ্দ্যো]",
+      "[গোল্দো]",
+      "[গাদ্য]"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 41,
+    "question": "শব্দের মধ্যে বা শেষে যুক্তব্যঞ্জনের সঙ্গে থাকা 'য'-এর উচ্চারণ কেমন হয়?",
+    "options": [
+      "দ্বিত্ব হয়",
+      "লোপ পায়",
+      "অনুনাসিক হয়",
+      "র-এর মতো হয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 42,
+    "question": "'স্বাস্থ্য' শব্দের সঠিক উচ্চারণ কোনটি?",
+    "options": [
+      "[স্বাস্থ্য]",
+      "[সাস্থো]",
+      "[শাস্থো]",
+      "[শাঙ্কো]"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 43,
+    "question": "শব্দের মধ্যে বা শেষে কোনো ব্যঞ্জনবর্ণের সঙ্গে র-ফলা থাকলে র-ফলা কেমনভাবে উচ্চারিত হয়?",
+    "options": [
+      "দ্বিত্বসহ",
+      "দ্বিত্ব ছাড়া",
+      "লোপ পেয়ে",
+      "অনুনাসিক হয়ে"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 44,
+    "question": "'মাত্র' শব্দের উচ্চারণ কেমন?",
+    "options": [
+      "[মাত্রো]",
+      "[মাতৃত্রো]",
+      "[মাৎত্রো]",
+      "[মা]"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 45,
+    "question": "শব্দের মধ্যে বা শেষে যুক্তব্যঞ্জনের সঙ্গে র-ফলা যুক্ত হলে দ্বিত্ব উচ্চারণ হয় কি না?",
+    "options": [
+      "হ্যাঁ, হয়",
+      "না, হয় না",
+      "সবসময় হয়",
+      "কখনো কখনো হয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 46,
+    "question": "'কেন্দ্র' শব্দের উচ্চারণ কেমন?",
+    "options": [
+      "[কেন্দ্রো]",
+      "[কেন্‌দ্রা]",
+      "[কেন্দ্রো]",
+      "[কেন্দ্‌রো]"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 47,
+    "question": "কোন বর্ণের উচ্চারণ সবসময় [শ] হয়?",
+    "options": [
+      "শ",
+      "ষ",
+      "স",
+      "কোনোটি নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 48,
+    "question": "'শ্রমিক' শব্দে 'শ'-এর উচ্চারণ কেমন?",
+    "options": [
+      "[শ]",
+      "[স]",
+      "[ষ]",
+      "[ছ]"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 49,
+    "question": "'ষোলো' শব্দের 'ষ'-এর উচ্চারণ কেমন?",
+    "options": [
+      "[শ]",
+      "[স]",
+      "[ছ]",
+      "[জ]"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 50,
+    "question": "'সাধারণ' শব্দে 'স'-এর উচ্চারণ কেমন?",
+    "options": [
+      "[শ]",
+      "[স]",
+      "[ষ]",
+      "[ছ]"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 51,
+    "question": "'সালাম' শব্দে 'স'-এর উচ্চারণ কেমন?",
+    "options": [
+      "[শ]",
+      "[স]",
+      "[ষ]",
+      "[ছ]"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 52,
+    "question": "'সর্দি' শব্দে 'স'-এর উচ্চারণ কেমন?",
+    "options": [
+      "[শ]",
+      "[স]",
+      "[ষ]",
+      "[ছ]"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 53,
+    "question": "'শস্য' শব্দের 'শ'-এর উচ্চারণ কেমন?",
+    "options": [
+      "[শ]",
+      "[স]",
+      "[ষ]",
+      "[ছ]"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 54,
+    "question": "'আকাশ' শব্দে 'ক' এর উচ্চারণ কেমন?",
+    "options": [
+      "[আকাশ]",
+      "[আকাস]",
+      "[আকাস]",
+      "[আকাশ]"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 55,
+    "question": "'বীণা' শব্দের 'ণ' এর উচ্চারণ কেমন?",
+    "options": [
+      "[ন]",
+      "[ণ]",
+      "[ট]",
+      "[ড]"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 56,
+    "question": "'শুশ্রূষা' শব্দে 'শ'-এর উচ্চারণ কেমন?",
+    "options": [
+      "[শ]",
+      "[স]",
+      "[ষ]",
+      "[ছ]"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 57,
+    "question": "'সৃষ্টি' শব্দে 'স'-এর উচ্চারণ কেমন?",
+    "options": [
+      "[শ]",
+      "[স]",
+      "[ষ]",
+      "[ছ]"
+    ],
+    "answer": 0
+  }
+];
+
+let currentQuestion = 0;
+let score = 0;
+let wrongAnswers = [];
+let timer;
+let timeLeft = 30;
+let paused = false;
+
+const questionEl = document.getElementById("question");
+const optionsEl = document.getElementById("options");
+const progressBar = document.getElementById("progress-bar");
+const timerBar = document.getElementById("timer-bar");
+const scoreEl = document.getElementById("score");
+const currentQuestionEl = document.getElementById("current-question");
+const totalQuestionsEl = document.getElementById("total-questions");
+const quizContainer = document.getElementById("quiz-container");
+const startScreen = document.getElementById("start-screen");
+const resultScreen = document.getElementById("result-screen");
+const finalScore = document.getElementById("final-score");
+const wrongSummary = document.getElementById("wrong-summary");
+
+totalQuestionsEl.innerText = quizData.length;
+
+function startQuiz() {
+    startScreen.style.display = "none";
+    quizContainer.style.display = "block";
+    currentQuestion = 0;
+    score = 0;
+    wrongAnswers = [];
+    updateScore();
+    showQuestion();
+    openFullscreen();
+}
+
+function showQuestion() {
+    if (currentQuestion >= quizData.length) {
+        endQuiz();
+        return;
+    }
+
+    timeLeft = 30;
+    updateTimer();
+    startTimer();
+
+    const q = quizData[currentQuestion];
+    questionEl.innerText = `${q.id}. ${q.question}`; // Show serial from JSON
+    adjustFontSize(questionEl, q.question, 6);
+
+    optionsEl.innerHTML = "";
+    q.options.forEach((option, index) => {
+        const btn = document.createElement("div");
+        btn.classList.add("option");
+        btn.innerText = option;
+        adjustFontSize(btn, option, 4);
+        btn.addEventListener("click", () => selectAnswer(index));
+        optionsEl.appendChild(btn);
+    });
+
+    currentQuestionEl.innerText = currentQuestion + 1;
+    progressBar.style.width = ((currentQuestion / quizData.length) * 100) + "%";
+}
+
+// Dynamic font adjustment
+function adjustFontSize(el, text, maxSize) {
+    let size = maxSize - Math.floor(text.length / 25);
+    if (size < 3) size = 3;
+    el.style.fontSize = size + "vw";
+}
+
+function selectAnswer(index) {
+    stopTimer();
+    const q = quizData[currentQuestion];
+    const optionEls = document.querySelectorAll(".option");
+
+    if (index === q.answer) {
+        optionEls[index].classList.add("correct");
+        score++;
+    } else {
+        optionEls[index].classList.add("wrong");
+        optionEls[q.answer].classList.add("correct");
+        wrongAnswers.push(q);
+    }
+
+    updateScore();
+    setTimeout(() => {
+        currentQuestion++;
+        showQuestion();
+    }, 1000);
+}
+
+function updateScore() { scoreEl.innerText = `Score: ${score}`; }
+
+function startTimer() {
+    timerBar.style.width = "100%";
+    timer = setInterval(() => {
+        if (!paused) {
+            timeLeft--;
+            timerBar.style.width = (timeLeft / 30 * 100) + "%";
+            if (timeLeft <= 0) {
+                stopTimer();
+                wrongAnswers.push(quizData[currentQuestion]);
+                currentQuestion++;
+                showQuestion();
+            }
+        }
+    }, 1000);
+}
+
+function stopTimer() { clearInterval(timer); }
+function updateTimer() { timerBar.style.width = "100%"; }
+function pauseQuiz() { paused = true; }
+function resumeQuiz() { paused = false; }
+function stopQuiz() { stopTimer(); endQuiz(); }
+
+function endQuiz() {
+    quizContainer.style.display = "none";
+    resultScreen.style.display = "flex";
+    finalScore.innerText = `${score} / ${quizData.length}`;
+    if(wrongAnswers.length > 0){
+        wrongSummary.innerText = `Wrong Answers: ${wrongAnswers.length} / ${quizData.length}`;
+    } else {
+        wrongSummary.innerText = "";
+    }
+}
+
+function restartQuiz() {
+    resultScreen.style.display = "none";
+    startScreen.style.display = "flex";
+}
+
+function retryWrong() {
+    if (wrongAnswers.length === 0) return;
+    quizData.splice(0, quizData.length, ...wrongAnswers);
+    resultScreen.style.display = "none";
+    quizContainer.style.display = "block";
+    currentQuestion = 0;
+    score = 0;
+    wrongAnswers = [];
+    updateScore();
+    showQuestion();
+}
+
+function openFullscreen() {
+    const elem = document.documentElement;
+    if (elem.requestFullscreen) { elem.requestFullscreen(); }
+    else if (elem.webkitRequestFullscreen) { elem.webkitRequestFullscreen(); }
+    else if (elem.msRequestFullscreen) { elem.msRequestFullscreen(); }
+}
+</script>
+
+</body>
+</html>

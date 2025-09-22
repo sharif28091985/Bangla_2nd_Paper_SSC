@@ -1,0 +1,1641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Full-Screen MCQ Quiz</title>
+<style>
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #1a1a1a;
+    font-family: Arial, sans-serif;
+    color: #fff;
+    overflow: hidden;
+}
+
+#quiz-container {
+    display: none;
+    width: 100%;
+    height: 100%;
+    position: relative;
+}
+
+.question {
+    text-align: center;
+    margin: 3% auto;
+    word-wrap: break-word;
+    font-weight: bold;
+}
+
+.options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 3%;
+    width: 85%;
+    height: 60%;
+    margin: 0 auto;
+}
+
+.option {
+    background-color: #333;
+    border: 2px solid #00ffff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold;
+    font-size: 4vw;
+    cursor: pointer;
+    text-align: center;
+    padding: 1%;
+    border-radius: 10px;
+    transition: 0.3s;
+}
+
+.option.correct { background-color: #00cc00; color: #000; }
+.option.wrong { background-color: #cc0000; color: #000; }
+
+.top-bar {
+    width: 100%;
+    height: 60px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 2%;
+    box-sizing: border-box;
+    font-size: 1.8vw;
+}
+
+.progress-container, .timer-container {
+    width: 35%;
+    background: #333;
+    border-radius: 25px;
+    overflow: hidden;
+}
+
+.progress-bar, .timer-bar {
+    height: 25px;
+    width: 0;
+    background-color: #00ffff;
+    transition: width 0.3s;
+}
+
+.score { color: #00ff00; }
+
+.control-buttons {
+    position: absolute;
+    top: 50%;
+    right: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.control-buttons button {
+    background-color: #333;
+    border: 2px solid #00ffff;
+    color: #fff;
+    font-weight: bold;
+    cursor: pointer;
+    border-radius: 10px;
+    transition: 0.3s;
+    padding: 10px 15px;
+    text-align: center;
+}
+
+#start-screen, #result-screen {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+    flex-direction: column;
+}
+
+#start-screen button, #result-screen button {
+    font-size: 3.5vw;
+    padding: 15px 30px;
+    cursor: pointer;
+    border-radius: 15px;
+    border: none;
+    background-color: #00ffff;
+    color: #000;
+    margin-top: 20px;
+}
+</style>
+</head>
+<body>
+
+<div id="start-screen">
+    <h1>Welcome to the Quiz!</h1>
+    <button onclick="startQuiz()">Start Quiz</button>
+</div>
+
+<div id="quiz-container">
+    <div class="top-bar">
+        <div>Q No: <span id="current-question">1</span> / <span id="total-questions"></span></div>
+        <div class="progress-container">
+            <div class="progress-bar" id="progress-bar"></div>
+        </div>
+        <div class="timer-container">
+            <div class="timer-bar" id="timer-bar"></div>
+        </div>
+        <div class="score" id="score">Score: 0</div>
+    </div>
+
+    <div class="question" id="question"></div>
+    <div class="options" id="options"></div>
+
+    <div class="control-buttons">
+        <button id="pause-btn" onclick="pauseQuiz()">Pause</button>
+        <button id="resume-btn" onclick="resumeQuiz()">Resume</button>
+        <button id="stop-btn" onclick="stopQuiz()">Stop</button>
+    </div>
+</div>
+
+<div id="result-screen">
+    <h1>Your Score: <span id="final-score"></span></h1>
+    <h2 id="wrong-summary"></h2>
+    <button onclick="retryWrong()">Retry Wrong Answers</button>
+    <button onclick="restartQuiz()">Restart Quiz</button>
+</div>
+
+<script>
+// JSON formatted questions
+const quizData = [
+  {
+    "id": 1,
+    "question": "বাক্যের বর্গ যখন বাচ্যার্থ বা আক্ষরিক অর্থ ছাপিয়ে বিশেষ কোনো অর্থ প্রকাশ করে, তখন তাকে কী বলে?",
+    "options": [
+      "বাক্য",
+      "শব্দগুচ্ছ",
+      "বাগধারা",
+      "প্রবাদ"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 2,
+    "question": "বাগধারার প্রয়োগে ভাষা কেমন হয়?",
+    "options": [
+      "প্রাণহীন",
+      "নিরস",
+      "প্রাণবন্ত",
+      "কোনোটিই নয়"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 3,
+    "question": "'অক্কা পাওয়া' বাগধারার অর্থ কী?",
+    "options": [
+      "মারা যাওয়া",
+      "সুস্থ হওয়া",
+      "ফিরে আসা",
+      "কোনোটিই নয়"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 4,
+    "question": "'অক্ষরে অক্ষরে' বাগধারার অর্থ কী?",
+    "options": [
+      "অসময়ে",
+      "যথাযথ",
+      "কোনো অক্ষর নেই",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 5,
+    "question": "'অদৃষ্টের পরিহাস' বাগধারার অর্থ কী?",
+    "options": [
+      "ভাগ্যের খেলা",
+      "মানুষের তৈরি",
+      "খারাপ ভাগ্য",
+      "কোনোটিই নয়"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 6,
+    "question": "'অনধিকার চর্চা' বাগধারার অর্থ কী?",
+    "options": [
+      "অধিকারের চর্চা",
+      "অপরের বিষয়ে হস্তক্ষেপ",
+      "অধিকারের অভাব",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 7,
+    "question": "'অন্ধকার দেখা' বাগধারার অর্থ কী?",
+    "options": [
+      "আলো নেই",
+      "দিশেহারা হয়ে পড়া",
+      "রাতের বেলা",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 8,
+    "question": "'অন্ধের যষ্টি' বাগধারার অর্থ কী?",
+    "options": [
+      "অন্ধের লাঠি",
+      "একমাত্র অবলম্বন",
+      "অন্ধের পথ",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 9,
+    "question": "'অমাবস্যার চাঁদ' বাগধারার অর্থ কী?",
+    "options": [
+      "অমাবস্যার রাতের চাঁদ",
+      "দুর্লভ বস্তু",
+      "অপ্রিয় বস্তু",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 10,
+    "question": "'অরণ্যে রোদন' বাগধারার অর্থ কী?",
+    "options": [
+      "বনে কান্নাকাটি",
+      "নিষ্ফল অনুনয়",
+      "বৃথা কাজ",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 11,
+    "question": "'অর্ধচন্দ্র' বাগধারার অর্থ কী?",
+    "options": [
+      "অর্ধেক চাঁদ",
+      "ঘাড় ধাক্কা দেয়া",
+      "চাঁদা চাওয়া",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 12,
+    "question": "'আঁতে ঘা' বাগধারার অর্থ কী?",
+    "options": [
+      "পেটে আঘাত",
+      "খুব কষ্ট",
+      "পেটে ব্যথা",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 13,
+    "question": "'আকাশ কুসুম' বাগধারার অর্থ কী?",
+    "options": [
+      "আকাশের ফুল",
+      "অসম্ভব কল্পনা",
+      "সুন্দর চিন্তা",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 14,
+    "question": "'আগুন নিয়ে খেলা' বাগধারার অর্থ কী?",
+    "options": [
+      "আগুন দিয়ে খেলা",
+      "বিপজ্জনক ঘটনার আশঙ্কা তৈরি করা",
+      "আগুন লাগানো",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 15,
+    "question": "'আঙুল ফুলে কলাগাছ' বাগধারার অর্থ কী?",
+    "options": [
+      "আঙুলে ব্যথা",
+      "হঠাৎ বড়োলোক হওয়া",
+      "খুব পরিশ্রম করা",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 16,
+    "question": "'আঠারো মাসে বছর' বাগধারার অর্থ কী?",
+    "options": [
+      "আঠারো মাস পর বছর",
+      "দীর্ঘসূত্রিতা",
+      "সময় বেশি লাগা",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 17,
+    "question": "'আদা-জল খেয়ে লাগা' বাগধারার অর্থ কী?",
+    "options": [
+      "আদা ও জল খাওয়া",
+      "প্রাণপণ চেষ্টা করা",
+      "সহজে কাজ করা",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 18,
+    "question": "'আমড়া কাঠের ঢেঁকি' বাগধারার অর্থ কী?",
+    "options": [
+      "ঢেঁকি তৈরি",
+      "অপদার্থ",
+      "কাঠ দিয়ে তৈরি",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 19,
+    "question": "'আষাঢ়ে গল্প' বাগধারার অর্থ কী?",
+    "options": [
+      "বর্ষাকালের গল্প",
+      "আজগুবি গল্প",
+      "মজার গল্প",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 20,
+    "question": "'ইঁচড়ে পাকা' বাগধারার অর্থ কী?",
+    "options": [
+      "কাঁচা ফল",
+      "অকালপক্ব",
+      "খারাপ ছেলে",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 21,
+    "question": "'ইতর বিশেষ' বাগধারার অর্থ কী?",
+    "options": [
+      "বিশেষ মানুষ",
+      "সাধারণ মানুষ",
+      "পার্থক্য",
+      "কোনোটিই নয়"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 22,
+    "question": "'উড়নচণ্ডী' বাগধারার অর্থ কী?",
+    "options": [
+      "উড়তে পারে এমন",
+      "বেহিসেবি",
+      "দ্রুত চলা",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 23,
+    "question": "'উড়ে এসে জুড়ে বসা' বাগধারার অর্থ কী?",
+    "options": [
+      "উড়ে এসে বসা",
+      "অপ্রত্যাশিতভাবে জায়গা দখল করা",
+      "হঠাৎ আসা",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 24,
+    "question": "'উড়োকথা' বাগধারার অর্থ কী?",
+    "options": [
+      "উড়ন্ত কথা",
+      "গুজব",
+      "উড়োচিঠি",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 25,
+    "question": "'উড়োচিঠি' বাগধারার অর্থ কী?",
+    "options": [
+      "উড়ন্ত চিঠি",
+      "গুজব",
+      "বেনামি চিঠি",
+      "কোনোটিই নয়"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 26,
+    "question": "'উত্তম-মধ্যম' বাগধারার অর্থ কী?",
+    "options": [
+      "উত্তম অবস্থা",
+      "মধ্যম অবস্থা",
+      "বেদম প্রহার",
+      "কোনোটিই নয়"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 27,
+    "question": "'উনিশ-বিশ' বাগধারার অর্থ কী?",
+    "options": [
+      "উনিশটি ও বিশটি",
+      "সামান্য পার্থক্য",
+      "অনেক পার্থক্য",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 28,
+    "question": "'এককথার মানুষ' বাগধারার অর্থ কী?",
+    "options": [
+      "একটি কথা বলে এমন",
+      "দৃঢ়সংকল্প ব্যক্তি",
+      "কম কথা বলে এমন",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 29,
+    "question": "'এক ঢিলে দুই পাখি' বাগধারার অর্থ কী?",
+    "options": [
+      "একটি ঢিল দিয়ে দুটি পাখি মারা",
+      "এক প্রচেষ্টায় দুই ফল",
+      "একটি কাজ করা",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 30,
+    "question": "'এলাহি কাণ্ড' বাগধারার অর্থ কী?",
+    "options": [
+      "একটি কাণ্ড",
+      "বিরাট আয়োজন",
+      "ছোটো আয়োজন",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 31,
+    "question": "'এসপার ওসপার' বাগধারার অর্থ কী?",
+    "options": [
+      "এদিক ওদিক",
+      "চূড়ান্ত মীমাংসা",
+      "উভয় দিকে",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 32,
+    "question": "'ওজন বুঝে চলা' বাগধারার অর্থ কী?",
+    "options": [
+      "নিজের ওজন মাপা",
+      "আত্মসম্মান রক্ষা করা",
+      "আস্তে চলা",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 33,
+    "question": "'কচুকাটা করা' বাগধারার অর্থ কী?",
+    "options": [
+      "কচু কাটা",
+      "ধ্বংস করা",
+      "ছোটো করা",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 34,
+    "question": "'কড়ায় গন্ডায়' বাগধারার অর্থ কী?",
+    "options": [
+      "অনেক টাকা",
+      "চুলচেরা হিসাব",
+      "কম হিসাব",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 35,
+    "question": "'কথার কথা' বাগধারার অর্থ কী?",
+    "options": [
+      "অনেক কথা",
+      "গুরুত্বহীন কথা",
+      "গুরুত্বপূর্ণ কথা",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 36,
+    "question": "'কপাল ফেরা' বাগধারার অর্থ কী?",
+    "options": [
+      "কপাল ভেঙে যাওয়া",
+      "খারাপ ভাগ্য",
+      "সৌভাগ্য লাভ",
+      "কোনোটিই নয়"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 37,
+    "question": "'কলমের এক খোঁচা' বাগধারার অর্থ কী?",
+    "options": [
+      "কলম দিয়ে খোঁচা",
+      "লিখিত আদেশ",
+      "কলম ভেঙে যাওয়া",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 38,
+    "question": "'কলুর বলদ' বাগধারার অর্থ কী?",
+    "options": [
+      "বলদ",
+      "একটানা খাটুনি",
+      "কলু",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 39,
+    "question": "'কাঁচা পয়সা' বাগধারার অর্থ কী?",
+    "options": [
+      "কাঁচা টাকা",
+      "নগদ উপার্জন",
+      "নতুন টাকা",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 40,
+    "question": "'কাগজে কলমে' বাগধারার অর্থ কী?",
+    "options": [
+      "কাগজে লেখা",
+      "লিখিতভাবে",
+      "কলম দিয়ে",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 41,
+    "question": "'কাছাঢিলা' বাগধারার অর্থ কী?",
+    "options": [
+      "কোমরে ঢিলা",
+      "অসাবধান",
+      "সাবধান",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 42,
+    "question": "'কাঠখোট্টা' বাগধারার অর্থ কী?",
+    "options": [
+      "কাঠ কাটা",
+      "নীরস ও অনমনীয়",
+      "নরম",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 43,
+    "question": "'কানকাটা' বাগধারার অর্থ কী?",
+    "options": [
+      "কান কাটা",
+      "নির্লজ্জ",
+      "কান শোনেনা",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 44,
+    "question": "'কান খাড়া করা' বাগধারার অর্থ কী?",
+    "options": [
+      "কান সোজা করা",
+      "ওত পেতে থাকা",
+      "কান দিয়ে শোনা",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 45,
+    "question": "'কান ভাঙানো' বাগধারার অর্থ কী?",
+    "options": [
+      "কান ভেঙে ফেলা",
+      "কুপরামর্শ",
+      "কান দিয়ে কথা",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 46,
+    "question": "'কিস্তিমাত করা' বাগধারার অর্থ কী?",
+    "options": [
+      "কিস্তি শেষ",
+      "সফলতা লাভ",
+      "ব্যর্থতা",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 47,
+    "question": "'কুয়োর ব্যাঙ' বাগধারার অর্থ কী?",
+    "options": [
+      "কুয়োর ব্যাঙ",
+      "সংকীর্ণমনা লোক",
+      "ব্যাঙের ডাক",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 48,
+    "question": "'কৈ মাছের প্রাণ' বাগধারার অর্থ কী?",
+    "options": [
+      "সহজে মরে না",
+      "কৈ মাছ",
+      "দুর্বল প্রাণ",
+      "কোনোটিই নয়"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 49,
+    "question": "'কোমর বাঁধা' বাগধারার অর্থ কী?",
+    "options": [
+      "কোমরে দড়ি বাঁধা",
+      "দৃঢ় সংকল্প",
+      "প্রস্তুত হওয়া",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 50,
+    "question": "'খয়ের খাঁ' বাগধারার অর্থ কী?",
+    "options": [
+      "খয়ের খায় এমন",
+      "চাটুকার",
+      "খারাপ মানুষ",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 51,
+    "question": "'খেজুরে আলাপ' বাগধারার অর্থ কী?",
+    "options": [
+      "খেজুরের গল্প",
+      "অকাজের কথা",
+      "কাজের কথা",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 52,
+    "question": "'গড্ডলিকা প্রবাহ' বাগধারার অর্থ কী?",
+    "options": [
+      "স্রোতে গা ভাসানো",
+      "অন্ধ অনুকরণ",
+      "অনুকরণ",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 53,
+    "question": "'গভীর জলের মাছ' বাগধারার অর্থ কী?",
+    "options": [
+      "গভীর জলের মাছ",
+      "খুব চালাক",
+      "গভীরের মাছ",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 54,
+    "question": "'গরম গরম' বাগধারার অর্থ কী?",
+    "options": [
+      "গরম",
+      "তৎক্ষণাৎ",
+      "গরম খবর",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 55,
+    "question": "'গা ঢাকা দেওয়া' বাগধারার অর্থ কী?",
+    "options": [
+      "শরীর ঢাকা",
+      "পলায়ন করা",
+      "পালিয়ে যাওয়া",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 56,
+    "question": "'গায়ে পড়া' বাগধারার অর্থ কী?",
+    "options": [
+      "গায়ে পড়া",
+      "অযাচিত",
+      "নিজ থেকে",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 57,
+    "question": "'গায়ে ফুঁ দিয়ে বেড়ানো' বাগধারার অর্থ কী?",
+    "options": [
+      "ফুঁ দিয়ে বেড়ানো",
+      "ফাঁকির মনোভাব",
+      "গায়ে হাওয়া",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 58,
+    "question": "'গুড়ে বালি' বাগধারার অর্থ কী?",
+    "options": [
+      "গুড়ে বালি পড়া",
+      "আশায় নৈরাশ্য",
+      "ভালো কিছু",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 59,
+    "question": "'গোঁফ খেজুরে' বাগধারার অর্থ কী?",
+    "options": [
+      "গোঁফে খেজুর",
+      "খুব অলস",
+      "অলস",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 60,
+    "question": "'গোড়ায় গলদ' বাগধারার অর্থ কী?",
+    "options": [
+      "গোড়ায় গলদ",
+      "শুরুতেই ভুল",
+      "ভুল করা",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 61,
+    "question": "'গোল্লায় যাওয়া' বাগধারার অর্থ কী?",
+    "options": [
+      "গোল্লায় যাওয়া",
+      "নষ্ট হওয়া",
+      "দূরে যাওয়া",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 62,
+    "question": "'ঘোড়া ডিঙিয়ে ঘাস খাওয়া' বাগধারার অর্থ কী?",
+    "options": [
+      "ঘোড়া ডিঙিয়ে ঘাস খাওয়া",
+      "মধ্যবর্তীকে অতিক্রম করে কাজ করা",
+      "সহজে কাজ করা",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 63,
+    "question": "'ঘোড়ার ডিম' বাগধারার অর্থ কী?",
+    "options": [
+      "ঘোড়ার ডিম",
+      "কিছুই না",
+      "ডিম",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 64,
+    "question": "'চশমখোর' বাগধারার অর্থ কী?",
+    "options": [
+      "চশমা খায় এমন",
+      "বেহায়া",
+      "চোর",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 65,
+    "question": "'চিনির বলদের মতো ঘানি টানা' বাগধারার অর্থ কী?",
+    "options": [
+      "চিনির বলদ",
+      "ফল লাভে অংশীদার না হওয়া",
+      "শুধু কাজ করা",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 66,
+    "question": "'চিনে জোঁক' বাগধারার অর্থ কী?",
+    "options": [
+      "চিনে জোঁক",
+      "নাছোড়বান্দা",
+      "দুর্বল",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 67,
+    "question": "'চুনোপুঁটি' বাগধারার অর্থ কী?",
+    "options": [
+      "চুনোপুঁটি মাছ",
+      "সামান্য ব্যক্তি",
+      "ছোটো ব্যক্তি",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 68,
+    "question": "'চুলোয় যাওয়া' বাগধারার অর্থ কী?",
+    "options": [
+      "চুলোয় যাওয়া",
+      "নষ্ট হওয়া",
+      "হারিয়ে যাওয়া",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 69,
+    "question": "'চোখ পাকানো' বাগধারার অর্থ কী?",
+    "options": [
+      "চোখ পেকে যাওয়া",
+      "রাগ দেখানো",
+      "চোখ রাঙানো",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 70,
+    "question": "'চোখ বুজে থাকা' বাগধারার অর্থ কী?",
+    "options": [
+      "চোখ বন্ধ করা",
+      "ভূমিকা না রাখা",
+      "না দেখা",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 71,
+    "question": "'চোখে সরষে ফুল দেখা' বাগধারার অর্থ কী?",
+    "options": [
+      "চোখে সরষে ফুল দেখা",
+      "বিপদে দিশেহারা হওয়া",
+      "চোখে ব্যথা",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 72,
+    "question": "'ছা-পোষা' বাগধারার অর্থ কী?",
+    "options": [
+      "ছাগল পোষা",
+      "অত্যন্ত গরিব",
+      "গরিব",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 73,
+    "question": "'ছেলের হাতের মোয়া' বাগধারার অর্থ কী?",
+    "options": [
+      "ছেলের হাতে মোয়া",
+      "সহজলভ্য",
+      "সহজে পাওয়া",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 74,
+    "question": "'জগাখিচুড়ি' বাগধারার অর্থ কী?",
+    "options": [
+      "জগা ও খিচুড়ি",
+      "বিশৃঙ্খল",
+      "খিচুড়ি",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 75,
+    "question": "'জিলাপির প্যাঁচ' বাগধারার অর্থ কী?",
+    "options": [
+      "জিলাপির প্যাঁচ",
+      "কূটবুদ্ধি",
+      "সরল",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 76,
+    "question": "'ঝোপ বুঝে কোপ মারা' বাগধারার অর্থ কী?",
+    "options": [
+      "ঝোপ বুঝে আঘাত",
+      "অবস্থা বুঝে সুযোগ গ্রহণ",
+      "সময় বুঝে কাজ",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 77,
+    "question": "'টইটম্বুর' বাগধারার অর্থ কী?",
+    "options": [
+      "ভরপুর",
+      "ফাঁকা",
+      "ভরা",
+      "কোনোটিই নয়"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 78,
+    "question": "'টনক নড়া' বাগধারার অর্থ কী?",
+    "options": [
+      "মাথা নাড়া",
+      "সজাগ হওয়া",
+      "ঘুম ভাঙা",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 79,
+    "question": "'টাকার গরম' বাগধারার অর্থ কী?",
+    "options": [
+      "গরম টাকা",
+      "বিত্তের অহংকার",
+      "অহংকার",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 80,
+    "question": "'ঠোঁট কাটা' বাগধারার অর্থ কী?",
+    "options": [
+      "ঠোঁট কাটা",
+      "বেহায়া",
+      "লজ্জাহীন",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 81,
+    "question": "'ডান হাতের ব্যাপার' বাগধারার অর্থ কী?",
+    "options": [
+      "ডান হাতের কাজ",
+      "খাওয়া",
+      "ডান হাতে খাওয়া",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 82,
+    "question": "'ডুব মারা' বাগধারার অর্থ কী?",
+    "options": [
+      "ডুব দেওয়া",
+      "পালিয়ে যাওয়া",
+      "হারিয়ে যাওয়া",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 83,
+    "question": "'ডুমুরের ফুল' বাগধারার অর্থ কী?",
+    "options": [
+      "ডুমুরের ফুল",
+      "অদৃশ্য বস্তু",
+      "দুর্লভ বস্তু",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 84,
+    "question": "'তালকানা' বাগধারার অর্থ কী?",
+    "options": [
+      "তালকানা",
+      "কাণ্ডজ্ঞানহীন",
+      "কাণ্ডজ্ঞান",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 85,
+    "question": "'তালপাতার সেপাই' বাগধারার অর্থ কী?",
+    "options": [
+      "তালপাতার সেপাই",
+      "ছিপছিপে",
+      "দুর্বল",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 86,
+    "question": "'তাসের ঘর' বাগধারার অর্থ কী?",
+    "options": [
+      "তাসের ঘর",
+      "স্বল্পস্থায়ী",
+      "অল্প সময়ের",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 87,
+    "question": "'তিলকে তাল করা' বাগধারার অর্থ কী?",
+    "options": [
+      "তিলকে তাল করা",
+      "ছোটোকে বড়ো করা",
+      "বড়োকে ছোটো করা",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 88,
+    "question": "'তীর্থের কাক' বাগধারার অর্থ কী?",
+    "options": [
+      "তীর্থের কাক",
+      "সুযোগ সন্ধানী",
+      "কাক",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 89,
+    "question": "'তেল মাখানো' বাগধারার অর্থ কী?",
+    "options": [
+      "তেল মাখা",
+      "তোশামোদ",
+      "তেল দেওয়া",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 90,
+    "question": "'থতমত খাওয়া' বাগধারার অর্থ কী?",
+    "options": [
+      "থতমত খাওয়া",
+      "অপ্রস্তুত হয়ে পড়া",
+      "হতভম্ব হওয়া",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 91,
+    "question": "'দা-কুমড়া সম্পর্ক' বাগধারার অর্থ কী?",
+    "options": [
+      "দা ও কুমড়া",
+      "শত্রুতা",
+      "বন্ধুত্ব",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 92,
+    "question": "'দিবাস্বপ্ন' বাগধারার অর্থ কী?",
+    "options": [
+      "দিনের স্বপ্ন",
+      "অলীক কল্পনা",
+      "স্বপ্ন",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 93,
+    "question": "'দুধের মাছি' বাগধারার অর্থ কী?",
+    "options": [
+      "দুধের মাছি",
+      "সুসময়ের বন্ধু",
+      "খারাপ বন্ধু",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 94,
+    "question": "'ধরাকে সরা জ্ঞান' বাগধারার অর্থ কী?",
+    "options": [
+      "ধরাকে সরানো",
+      "অহংকার করা",
+      "অহংকার",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 95,
+    "question": "'ননীর পুতুল' বাগধারার অর্থ কী?",
+    "options": [
+      "ননীর পুতুল",
+      "শ্রমবিমুখ",
+      "অলস",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 96,
+    "question": "'নয় ছয়' বাগধারার অর্থ কী?",
+    "options": [
+      "নয় ও ছয়",
+      "অপব্যবহার",
+      "অপচয়",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 97,
+    "question": "'পটল তোলা' বাগধারার অর্থ কী?",
+    "options": [
+      "পটল তোলা",
+      "মারা যাওয়া",
+      "ফল তোলা",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 98,
+    "question": "'পুঁটি মাছের প্রাণ' বাগধারার অর্থ কী?",
+    "options": [
+      "পুঁটি মাছের প্রাণ",
+      "ছোটো মন",
+      "দুর্বল মন",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 99,
+    "question": "'বইয়ের পোকা' বাগধারার অর্থ কী?",
+    "options": [
+      "বইয়ের পোকা",
+      "সব সময়ে বই পড়ে এমন",
+      "বই পড়ে না",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 100,
+    "question": "'বর্ণচোরা' বাগধারার অর্থ কী?",
+    "options": [
+      "বর্ণ চোর",
+      "ভণ্ড",
+      "খারাপ",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 101,
+    "question": "'বাঘের দুধ' বাগধারার অর্থ কী?",
+    "options": [
+      "বাঘের দুধ",
+      "অসম্ভব বস্তু",
+      "দুষ্প্রাপ্য বস্তু",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 102,
+    "question": "'বিনা মেঘে বজ্রপাত' বাগধারার অর্থ কী?",
+    "options": [
+      "বিনা মেঘে বজ্রপাত",
+      "অপ্রত্যাশিত বিপদ",
+      "হঠাৎ বিপদ",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 103,
+    "question": "'বুদ্ধির ঢেঁকি' বাগধারার অর্থ কী?",
+    "options": [
+      "ঢেঁকি",
+      "নির্বোধ",
+      "বুদ্ধিমান",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 104,
+    "question": "'ভরাডুবি' বাগধারার অর্থ কী?",
+    "options": [
+      "ভরাডুবি",
+      "সর্বনাশ",
+      "ক্ষতি",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 105,
+    "question": "'ভিজে বিড়াল' বাগধারার অর্থ কী?",
+    "options": [
+      "ভেজা বিড়াল",
+      "কপট ব্যক্তি",
+      "দুর্বল ব্যক্তি",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 106,
+    "question": "'ভিটায় ঘুঘু চরানো' বাগধারার অর্থ কী?",
+    "options": [
+      "ভিটা",
+      "নিঃস্ব করা",
+      "ধ্বংস করা",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 107,
+    "question": "'ভুঁইফোঁড়' বাগধারার অর্থ কী?",
+    "options": [
+      "ভূঁই",
+      "নতুন আগমন",
+      "হঠাৎ আগমন",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 108,
+    "question": "'মগের মুল্লুক' বাগধারার অর্থ কী?",
+    "options": [
+      "মগের মুল্লুক",
+      "অরাজকতা",
+      "বিশৃঙ্খলা",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 109,
+    "question": "'মণিকাঞ্চন যোগ' বাগধারার অর্থ কী?",
+    "options": [
+      "মণিকা ও কাঞ্চন",
+      "উপযুক্ত মিলন",
+      "গভীর সম্পর্ক",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 110,
+    "question": "'মানিক জোড়' বাগধারার অর্থ কী?",
+    "options": [
+      "মানিক ও জোড়",
+      "গভীর সম্পর্ক",
+      "উপযুক্ত মিলন",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 111,
+    "question": "'লেফাফা দুরস্ত' বাগধারার অর্থ কী?",
+    "options": [
+      "লেফাফা",
+      "বাইরে পরিপাটি",
+      "ভিতরে সুন্দর",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 112,
+    "question": "'সপ্তমে চড়া' বাগধারার অর্থ কী?",
+    "options": [
+      "সপ্তম",
+      "প্রচণ্ড উত্তেজনা",
+      "রাগ",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 113,
+    "question": "'সোনায় সোহাগা' বাগধারার অর্থ কী?",
+    "options": [
+      "সোনায় সোহাগা",
+      "উপযুক্ত মিলন",
+      "সুন্দর",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 114,
+    "question": "বাগধারার প্রয়োগে বাক্য কী সৃষ্টি করতে পারে?",
+    "options": [
+      "বিতর্ক",
+      "ব্যঞ্জনা",
+      "অর্থ",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 115,
+    "question": "বাগধারা কী ধরনের অর্থ ধারণ করে না?",
+    "options": [
+      "আক্ষরিক",
+      "বিশেষ",
+      "ব্যঞ্জনামূলক",
+      "কোনোটিই নয়"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 116,
+    "question": "বাগধারাকে কী বলা হয়?",
+    "options": [
+      "অতীত কালের ঘটনার স্মারক",
+      "বর্তমান কালের ঘটনার স্মারক",
+      "ভবিষ্যৎ কালের ঘটনার স্মারক",
+      "কোনোটিই নয়"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 117,
+    "question": "'অক্কা পাওয়া' এবং 'পটল তোলা' এই দুটি বাগধারার অর্থ কী?",
+    "options": [
+      "সুস্থ হওয়া",
+      "মারা যাওয়া",
+      "জীবিত হওয়া",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 118,
+    "question": "'কুয়োর ব্যাঙ' এবং 'তালকানা' এই দুটি বাগধারার মধ্যে কী মিল আছে?",
+    "options": [
+      "উভয়ই নির্বোধ বোঝায়",
+      "উভয়ই চালাক বোঝায়",
+      "উভয়ই অলস বোঝায়",
+      "কোনোটিই নয়"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 119,
+    "question": "'ভিজে বিড়াল' এবং 'বর্ণচোরা' এই দুটি বাগধারার মধ্যে কী মিল আছে?",
+    "options": [
+      "উভয়ই কপট ব্যক্তি বোঝায়",
+      "উভয়ই অলস বোঝায়",
+      "উভয়ই চালাক বোঝায়",
+      "কোনোটিই নয়"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 120,
+    "question": "'অরণ্যে রোদন' এবং 'আষাঢ়ে গল্প' এই দুটি বাগধারার মধ্যে কী মিল আছে?",
+    "options": [
+      "উভয়ই নিষ্ফল কাজ বোঝায়",
+      "উভয়ই গুজব বোঝায়",
+      "উভয়ই অতিরঞ্জন বোঝায়",
+      "কোনোটিই নয়"
+    ],
+    "answer": 0
+  }
+];
+
+let currentQuestion = 0;
+let score = 0;
+let wrongAnswers = [];
+let timer;
+let timeLeft = 30;
+let paused = false;
+
+const questionEl = document.getElementById("question");
+const optionsEl = document.getElementById("options");
+const progressBar = document.getElementById("progress-bar");
+const timerBar = document.getElementById("timer-bar");
+const scoreEl = document.getElementById("score");
+const currentQuestionEl = document.getElementById("current-question");
+const totalQuestionsEl = document.getElementById("total-questions");
+const quizContainer = document.getElementById("quiz-container");
+const startScreen = document.getElementById("start-screen");
+const resultScreen = document.getElementById("result-screen");
+const finalScore = document.getElementById("final-score");
+const wrongSummary = document.getElementById("wrong-summary");
+
+totalQuestionsEl.innerText = quizData.length;
+
+function startQuiz() {
+    startScreen.style.display = "none";
+    quizContainer.style.display = "block";
+    currentQuestion = 0;
+    score = 0;
+    wrongAnswers = [];
+    updateScore();
+    showQuestion();
+    openFullscreen();
+}
+
+function showQuestion() {
+    if (currentQuestion >= quizData.length) {
+        endQuiz();
+        return;
+    }
+
+    timeLeft = 30;
+    updateTimer();
+    startTimer();
+
+    const q = quizData[currentQuestion];
+    questionEl.innerText = `${q.id}. ${q.question}`; // Show serial from JSON
+    adjustFontSize(questionEl, q.question, 6);
+
+    optionsEl.innerHTML = "";
+    q.options.forEach((option, index) => {
+        const btn = document.createElement("div");
+        btn.classList.add("option");
+        btn.innerText = option;
+        adjustFontSize(btn, option, 4);
+        btn.addEventListener("click", () => selectAnswer(index));
+        optionsEl.appendChild(btn);
+    });
+
+    currentQuestionEl.innerText = currentQuestion + 1;
+    progressBar.style.width = ((currentQuestion / quizData.length) * 100) + "%";
+}
+
+// Dynamic font adjustment
+function adjustFontSize(el, text, maxSize) {
+    let size = maxSize - Math.floor(text.length / 25);
+    if (size < 3) size = 3;
+    el.style.fontSize = size + "vw";
+}
+
+function selectAnswer(index) {
+    stopTimer();
+    const q = quizData[currentQuestion];
+    const optionEls = document.querySelectorAll(".option");
+
+    if (index === q.answer) {
+        optionEls[index].classList.add("correct");
+        score++;
+    } else {
+        optionEls[index].classList.add("wrong");
+        optionEls[q.answer].classList.add("correct");
+        wrongAnswers.push(q);
+    }
+
+    updateScore();
+    setTimeout(() => {
+        currentQuestion++;
+        showQuestion();
+    }, 1000);
+}
+
+function updateScore() { scoreEl.innerText = `Score: ${score}`; }
+
+function startTimer() {
+    timerBar.style.width = "100%";
+    timer = setInterval(() => {
+        if (!paused) {
+            timeLeft--;
+            timerBar.style.width = (timeLeft / 30 * 100) + "%";
+            if (timeLeft <= 0) {
+                stopTimer();
+                wrongAnswers.push(quizData[currentQuestion]);
+                currentQuestion++;
+                showQuestion();
+            }
+        }
+    }, 1000);
+}
+
+function stopTimer() { clearInterval(timer); }
+function updateTimer() { timerBar.style.width = "100%"; }
+function pauseQuiz() { paused = true; }
+function resumeQuiz() { paused = false; }
+function stopQuiz() { stopTimer(); endQuiz(); }
+
+function endQuiz() {
+    quizContainer.style.display = "none";
+    resultScreen.style.display = "flex";
+    finalScore.innerText = `${score} / ${quizData.length}`;
+    if(wrongAnswers.length > 0){
+        wrongSummary.innerText = `Wrong Answers: ${wrongAnswers.length} / ${quizData.length}`;
+    } else {
+        wrongSummary.innerText = "";
+    }
+}
+
+function restartQuiz() {
+    resultScreen.style.display = "none";
+    startScreen.style.display = "flex";
+}
+
+function retryWrong() {
+    if (wrongAnswers.length === 0) return;
+    quizData.splice(0, quizData.length, ...wrongAnswers);
+    resultScreen.style.display = "none";
+    quizContainer.style.display = "block";
+    currentQuestion = 0;
+    score = 0;
+    wrongAnswers = [];
+    updateScore();
+    showQuestion();
+}
+
+function openFullscreen() {
+    const elem = document.documentElement;
+    if (elem.requestFullscreen) { elem.requestFullscreen(); }
+    else if (elem.webkitRequestFullscreen) { elem.webkitRequestFullscreen(); }
+    else if (elem.msRequestFullscreen) { elem.msRequestFullscreen(); }
+}
+</script>
+
+</body>
+</html>

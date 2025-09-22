@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Full-Screen MCQ Quiz</title>
+<style>
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #1a1a1a;
+    font-family: Arial, sans-serif;
+    color: #fff;
+    overflow: hidden;
+}
+
+#quiz-container {
+    display: none;
+    width: 100%;
+    height: 100%;
+    position: relative;
+}
+
+.question {
+    text-align: center;
+    margin: 3% auto;
+    word-wrap: break-word;
+    font-weight: bold;
+}
+
+.options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 3%;
+    width: 85%;
+    height: 60%;
+    margin: 0 auto;
+}
+
+.option {
+    background-color: #333;
+    border: 2px solid #00ffff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold;
+    font-size: 4vw;
+    cursor: pointer;
+    text-align: center;
+    padding: 1%;
+    border-radius: 10px;
+    transition: 0.3s;
+}
+
+.option.correct { background-color: #00cc00; color: #000; }
+.option.wrong { background-color: #cc0000; color: #000; }
+
+.top-bar {
+    width: 100%;
+    height: 60px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 2%;
+    box-sizing: border-box;
+    font-size: 1.8vw;
+}
+
+.progress-container, .timer-container {
+    width: 35%;
+    background: #333;
+    border-radius: 25px;
+    overflow: hidden;
+}
+
+.progress-bar, .timer-bar {
+    height: 25px;
+    width: 0;
+    background-color: #00ffff;
+    transition: width 0.3s;
+}
+
+.score { color: #00ff00; }
+
+.control-buttons {
+    position: absolute;
+    top: 50%;
+    right: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.control-buttons button {
+    background-color: #333;
+    border: 2px solid #00ffff;
+    color: #fff;
+    font-weight: bold;
+    cursor: pointer;
+    border-radius: 10px;
+    transition: 0.3s;
+    padding: 10px 15px;
+    text-align: center;
+}
+
+#start-screen, #result-screen {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+    flex-direction: column;
+}
+
+#start-screen button, #result-screen button {
+    font-size: 3.5vw;
+    padding: 15px 30px;
+    cursor: pointer;
+    border-radius: 15px;
+    border: none;
+    background-color: #00ffff;
+    color: #000;
+    margin-top: 20px;
+}
+</style>
+</head>
+<body>
+
+<div id="start-screen">
+    <h1>Welcome to the Quiz!</h1>
+    <button onclick="startQuiz()">Start Quiz</button>
+</div>
+
+<div id="quiz-container">
+    <div class="top-bar">
+        <div>Q No: <span id="current-question">1</span> / <span id="total-questions"></span></div>
+        <div class="progress-container">
+            <div class="progress-bar" id="progress-bar"></div>
+        </div>
+        <div class="timer-container">
+            <div class="timer-bar" id="timer-bar"></div>
+        </div>
+        <div class="score" id="score">Score: 0</div>
+    </div>
+
+    <div class="question" id="question"></div>
+    <div class="options" id="options"></div>
+
+    <div class="control-buttons">
+        <button id="pause-btn" onclick="pauseQuiz()">Pause</button>
+        <button id="resume-btn" onclick="resumeQuiz()">Resume</button>
+        <button id="stop-btn" onclick="stopQuiz()">Stop</button>
+    </div>
+</div>
+
+<div id="result-screen">
+    <h1>Your Score: <span id="final-score"></span></h1>
+    <h2 id="wrong-summary"></h2>
+    <button onclick="retryWrong()">Retry Wrong Answers</button>
+    <button onclick="restartQuiz()">Restart Quiz</button>
+</div>
+
+<script>
+// JSON formatted questions
+const quizData = [
+  {
+    "id": 1,
+    "question": "যে শব্দ ক্রিয়াকে বিশেষিত করে, তাকে কী বলে?",
+    "options": [
+      "বিশেষ্য",
+      "বিশেষণ",
+      "ক্রিয়াবিশেষণ",
+      "অব্যয়"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 2,
+    "question": "'ছেলেটি দ্রুত দৌড়ায়'—এই বাক্যে 'দ্রুত' শব্দটি কোন পদের উদাহরণ?",
+    "options": [
+      "বিশেষণ",
+      "ক্রিয়াবিশেষণ",
+      "বিশেষ্য",
+      "অব্যয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 3,
+    "question": "'লোকটি ধীরে হাঁটে'—এই বাক্যে 'ধীরে' কী ধরনের শব্দ?",
+    "options": [
+      "বিশেষণ",
+      "ক্রিয়াবিশেষণ",
+      "বিশেষ্য",
+      "অব্যয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 4,
+    "question": "ক্রিয়াবিশেষণ তৈরি হয় কোন শব্দাংশ যুক্ত হয়ে?",
+    "options": [
+      "'-এ', '-তে', '-ভাবে'",
+      "'-ক', '-তা', '-ত্ব'",
+      "'-ত্ব', '-তা'",
+      "'-ই', '-টি'"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 5,
+    "question": "'ভ্রান্তিবশত' শব্দটি কোন ধরনের ক্রিয়াবিশেষণ?",
+    "options": [
+      "ধরনবাচক",
+      "কালবাচক",
+      "স্থানবাচক",
+      "শব্দাংশ যুক্ত ক্রিয়াবিশেষণ"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 6,
+    "question": "ক্রিয়াবিশেষণকে প্রধানত কয় ভাগে ভাগ করা যায়?",
+    "options": [
+      "দুই",
+      "তিন",
+      "চার",
+      "পাঁচ"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 7,
+    "question": "'টিপ টিপ বৃষ্টি পড়ছে'—এই বাক্যে 'টিপ টিপ' কোন ধরনের ক্রিয়াবিশেষণ?",
+    "options": [
+      "কালবাচক",
+      "স্থানবাচক",
+      "ধরনবাচক",
+      "নেতিবাচক"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 8,
+    "question": "'যথাসময়ে সে হাজির হয়'—এখানে 'যথাসময়ে' কোন ধরনের ক্রিয়াবিশেষণ?",
+    "options": [
+      "ধরনবাচক",
+      "কালবাচক",
+      "স্থানবাচক",
+      "নেতিবাচক"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 9,
+    "question": "যে ক্রিয়াবিশেষণ ক্রিয়ার সম্পাদনের কাল নির্দেশ করে, তাকে কী বলে?",
+    "options": [
+      "ধরনবাচক",
+      "কালবাচক",
+      "স্থানবাচক",
+      "নেতিবাচক"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 10,
+    "question": "'মিছিলটি সামনে এগিয়ে যায়'—এখানে 'সামনে' কোন ধরনের ক্রিয়াবিশেষণ?",
+    "options": [
+      "কালবাচক",
+      "স্থানবাচক",
+      "নেতিবাচক",
+      "ধরনবাচক"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 11,
+    "question": "'তাকে কোথাও খুঁজে পাওয়া যাচ্ছে না'—এই বাক্যে 'কোথাও' কোন ধরনের ক্রিয়াবিশেষণ?",
+    "options": [
+      "কালবাচক",
+      "স্থানবাচক",
+      "নেতিবাচক",
+      "পদাণু"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 12,
+    "question": "'না', 'নি' দিয়ে ক্রিয়ার নেতিবাচক অবস্থা বোঝায়—এ ধরনের ক্রিয়াবিশেষণকে কী বলে?",
+    "options": [
+      "ধরনবাচক",
+      "কালবাচক",
+      "স্থানবাচক",
+      "নেতিবাচক"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 13,
+    "question": "'তিনি বেড়াতে যাননি'—এই বাক্যে 'যাননি' শব্দটি কোন ধরনের ক্রিয়াবিশেষণের উদাহরণ?",
+    "options": [
+      "ধরনবাচক",
+      "কালবাচক",
+      "নেতিবাচক",
+      "পদাণু"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 14,
+    "question": "'কি', 'যে', 'বা', 'না', 'তো' প্রভৃতি পদাণু ক্রিয়াবিশেষণ হিসেবে কাজ করে, এগুলোকে কী বলে?",
+    "options": [
+      "ধরনবাচক",
+      "কালবাচক",
+      "পদাণু ক্রিয়াবিশেষণ",
+      "নেতিবাচক"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 15,
+    "question": "'খুব যে বলেছিলেন আসবেন!'—এই বাক্যে 'যে' কী হিসেবে ব্যবহৃত হয়েছে?",
+    "options": [
+      "অব্যয়",
+      "বিশেষণ",
+      "পদাণু ক্রিয়াবিশেষণ",
+      "সর্বনাম"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 16,
+    "question": "'একটু ঘুরে আসুন না, ভালো লাগবে'—এই বাক্যে 'না' কী হিসেবে ব্যবহৃত হয়েছে?",
+    "options": [
+      "নেতিবাচক",
+      "পদাণু ক্রিয়াবিশেষণ",
+      "প্রশ্নবাচক",
+      "অব্যয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 17,
+    "question": "গঠন বিবেচনায় ক্রিয়াবিশেষণ কত প্রকার?",
+    "options": [
+      "এক",
+      "দুই",
+      "তিন",
+      "চার"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 18,
+    "question": "'আস্তে', 'জোরে', 'চেঁচিয়ে'—এগুলো কোন ধরনের ক্রিয়াবিশেষণ?",
+    "options": [
+      "বহুপদী",
+      "একপদী",
+      "নেতিবাচক",
+      "পদাণু"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 19,
+    "question": "'ভয়ে ভয়ে', 'চুপি চুপি'—এগুলো কোন ধরনের ক্রিয়াবিশেষণ?",
+    "options": [
+      "একপদী",
+      "বহুপদী",
+      "নেতিবাচক",
+      "পদাণু"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 20,
+    "question": "'ছেলেটি দ্রুত দৌড়ায়'—এই বাক্যে ক্রিয়া কোনটি?",
+    "options": [
+      "ছেলেটি",
+      "দ্রুত",
+      "দৌড়ায়",
+      "কোনোটিই নয়"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 21,
+    "question": "'সে এখন যাবে না'—এই বাক্যে 'না' কী নির্দেশ করে?",
+    "options": [
+      "ক্রিয়ার নেতিবাচক অবস্থা",
+      "ক্রিয়ার ধরন",
+      "ক্রিয়ার কাল",
+      "ক্রিয়ার স্থান"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 22,
+    "question": "'মরি তো মরব'—এই বাক্যে 'তো' কোন ধরনের ক্রিয়াবিশেষণ?",
+    "options": [
+      "নেতিবাচক",
+      "পদাণু",
+      "একপদী",
+      "বহুপদী"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 23,
+    "question": "'মেয়েটি গুনগুনিয়ে গান করছে'—এই বাক্যে 'গুনগুনিয়ে' কোন ধরনের ক্রিয়াবিশেষণ?",
+    "options": [
+      "ধরনবাচক",
+      "কালবাচক",
+      "স্থানবাচক",
+      "নেতিবাচক"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 24,
+    "question": "'আজকাল ফলের চেয়ে ফুলের দাম বেশি'—এই বাক্যে 'আজকাল' কী নির্দেশ করে?",
+    "options": [
+      "ক্রিয়ার ধরন",
+      "ক্রিয়ার কাল",
+      "ক্রিয়ার স্থান",
+      "ক্রিয়ার অবস্থা"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 25,
+    "question": "'এমন কথা আমার জানা নেই'—এই বাক্যে 'নেই' কোন ধরনের ক্রিয়াবিশেষণ?",
+    "options": [
+      "ধরনবাচক",
+      "কালবাচক",
+      "নেতিবাচক",
+      "পদাণু"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 26,
+    "question": "'শান্তভাবে' শব্দটি কোন ধরনের ক্রিয়াবিশেষণ?",
+    "options": [
+      "ধরনবাচক",
+      "কালবাচক",
+      "স্থানবাচক",
+      "নেতিবাচক"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 27,
+    "question": "'দ্রুতগতিতে' শব্দটি কোন ধরনের ক্রিয়াবিশেষণ?",
+    "options": [
+      "ধরনবাচক",
+      "কালবাচক",
+      "স্থানবাচক",
+      "নেতিবাচক"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 28,
+    "question": "'ঠিকভাবে চললে কেউ কিছু বলবে না'—এই বাক্যে 'ঠিকভাবে' কোন ধরনের ক্রিয়াবিশেষণ?",
+    "options": [
+      "কালবাচক",
+      "স্থানবাচক",
+      "নেতিবাচক",
+      "ধরনবাচক"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 29,
+    "question": "'কখনো বা দেখা হবে'—এই বাক্যে 'বা' কী হিসেবে কাজ করে?",
+    "options": [
+      "অব্যয়",
+      "যোজক",
+      "পদাণু ক্রিয়াবিশেষণ",
+      "সর্বনাম"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 30,
+    "question": "'আমি কি যাব?'—এই বাক্যে 'কি' কী হিসেবে ব্যবহৃত হয়েছে?",
+    "options": [
+      "প্রশ্নবাচক",
+      "পদাণু ক্রিয়াবিশেষণ",
+      "অব্যয়",
+      "বিশেষণ"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 31,
+    "question": "'খুব ভালো খবর' বাক্যে 'খুব' কোন ধরনের ক্রিয়াবিশেষণ?",
+    "options": [
+      "ধরনবাচক",
+      "কালবাচক",
+      "ভাববাচক",
+      "নির্দিষ্টতাবাচক"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 32,
+    "question": "'গাড়িটা বেশ জোরে চলছে' বাক্যে 'বেশ' কোন ধরনের ক্রিয়াবিশেষণ?",
+    "options": [
+      "গুণবাচক",
+      "অবস্থাবাচক",
+      "ভাববাচক",
+      "নির্দিষ্টতাবাচক"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 33,
+    "question": "'চালাক ছেলে' বাক্যে 'চালাক' কোন ধরনের ক্রিয়াবিশেষণ?",
+    "options": [
+      "গুণবাচক",
+      "অবস্থাবাচক",
+      "ক্রমবাচক",
+      "পরিমাণবাচক"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 34,
+    "question": "'কাঠের পুতুল' বাক্যে 'কাঠের' কোন ধরনের ক্রিয়াবিশেষণ?",
+    "options": [
+      "পরিমাণবাচক",
+      "উপাদানবাচক",
+      "প্রশ্নবাচক",
+      "নির্দিষ্টতাবাচক"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 35,
+    "question": "'কোন পথে যাবো?' বাক্যে 'কোন' কোন ধরনের ক্রিয়াবিশেষণ?",
+    "options": [
+      "ক্রমবাচক",
+      "পরিমাণবাচক",
+      "প্রশ্নবাচক",
+      "নির্দিষ্টতাবাচক"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 36,
+    "question": "'পাঁচ জন' বাক্যে 'পাঁচ' কোন ধরনের ক্রিয়াবিশেষণ?",
+    "options": [
+      "ক্রমবাচক",
+      "পরিমাণবাচক",
+      "পূরণবাচক",
+      "গুণবাচক"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 37,
+    "question": "'উত্তেজিত জনতা' বাক্যে 'উত্তেজিত' কোন ধরনের ক্রিয়াবিশেষণ?",
+    "options": [
+      "গুণবাচক",
+      "অবস্থাবাচক",
+      "ক্রমবাচক",
+      "পরিমাণবাচক"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 38,
+    "question": "'সবুজ ঘাস' বাক্যে 'সবুজ' কোন ধরনের ক্রিয়াবিশেষণ?",
+    "options": [
+      "গুণবাচক",
+      "বর্ণবাচক",
+      "অবস্থাবাচক",
+      "পরিমাণবাচক"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 39,
+    "question": "'সুষ্ঠু বিচার' বাক্যে 'সুষ্ঠু' কোন ধরনের ক্রিয়াবিশেষণ?",
+    "options": [
+      "গুণবাচক",
+      "অবস্থাবাচক",
+      "ক্রমবাচক",
+      "পরিমাণবাচক"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 40,
+    "question": "'ধোঁয়াটে আবহাওয়া' বাক্যে 'ধোঁয়াটে' কোন ধরনের ক্রিয়াবিশেষণ?",
+    "options": [
+      "গুণবাচক",
+      "অবস্থাবাচক",
+      "ক্রমবাচক",
+      "পরিমাণবাচক"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 41,
+    "question": "'নতুন জামা' বাক্যে 'নতুন' শব্দটি কোন ধরনের বিশেষণ?",
+    "options": [
+      "গুণবাচক",
+      "অবস্থাবাচক",
+      "ক্রমবাচক",
+      "পরিমাণবাচক"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 42,
+    "question": "'শীতল বাতাস' বাক্যে 'শীতল' কোন ধরনের বিশেষণ?",
+    "options": [
+      "গুণবাচক",
+      "অবস্থাবাচক",
+      "ক্রমবাচক",
+      "পরিমাণবাচক"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 43,
+    "question": "'এই ছেলেটি' বাক্যে 'এই' শব্দটি কোন ধরনের বিশেষণ?",
+    "options": [
+      "ক্রমবাচক",
+      "পরিমাণবাচক",
+      "প্রশ্নবাচক",
+      "নির্দিষ্টতাবাচক"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 44,
+    "question": "'দশটি ডিম' বাক্যে 'দশটি' কোন ধরনের বিশেষণ?",
+    "options": [
+      "ক্রমবাচক",
+      "পরিমাণবাচক",
+      "পূরণবাচক",
+      "উপাদানবাচক"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 45,
+    "question": "'প্রথম শ্রেণী' বাক্যে 'প্রথম' কোন ধরনের বিশেষণ?",
+    "options": [
+      "ক্রমবাচক",
+      "পূরণবাচক",
+      "পরিমাণবাচক",
+      "প্রশ্নবাচক"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 46,
+    "question": "'সোনালি চুল' বাক্যে 'সোনালি' কোন ধরনের বিশেষণ?",
+    "options": [
+      "গুণবাচক",
+      "বর্ণবাচক",
+      "অবস্থাবাচক",
+      "পরিমাণবাচক"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 47,
+    "question": "'লোহার গেট' বাক্যে 'লোহার' কোন ধরনের বিশেষণ?",
+    "options": [
+      "পরিমাণবাচক",
+      "উপাদানবাচক",
+      "প্রশ্নবাচক",
+      "নির্দিষ্টতাবাচক"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 48,
+    "question": "'কেমন লোক?' বাক্যে 'কেমন' শব্দটি কোন ধরনের বিশেষণ?",
+    "options": [
+      "গুণবাচক",
+      "অবস্থাবাচক",
+      "প্রশ্নবাচক",
+      "নির্দিষ্টতাবাচক"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 49,
+    "question": "'অষ্টম শ্রেণী' বাক্যে 'অষ্টম' কোন ধরনের বিশেষণ?",
+    "options": [
+      "ক্রমবাচক",
+      "পূরণবাচক",
+      "পরিমাণবাচক",
+      "গুণবাচক"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 50,
+    "question": "'খুব খারাপ খবর' বাক্যে 'খুব' কোন ধরনের বিশেষণ?",
+    "options": [
+      "গুণবাচক",
+      "অবস্থাবাচক",
+      "ভাববাচক",
+      "নির্দিষ্টতাবাচক"
+    ],
+    "answer": 2
+  }
+];
+
+let currentQuestion = 0;
+let score = 0;
+let wrongAnswers = [];
+let timer;
+let timeLeft = 30;
+let paused = false;
+
+const questionEl = document.getElementById("question");
+const optionsEl = document.getElementById("options");
+const progressBar = document.getElementById("progress-bar");
+const timerBar = document.getElementById("timer-bar");
+const scoreEl = document.getElementById("score");
+const currentQuestionEl = document.getElementById("current-question");
+const totalQuestionsEl = document.getElementById("total-questions");
+const quizContainer = document.getElementById("quiz-container");
+const startScreen = document.getElementById("start-screen");
+const resultScreen = document.getElementById("result-screen");
+const finalScore = document.getElementById("final-score");
+const wrongSummary = document.getElementById("wrong-summary");
+
+totalQuestionsEl.innerText = quizData.length;
+
+function startQuiz() {
+    startScreen.style.display = "none";
+    quizContainer.style.display = "block";
+    currentQuestion = 0;
+    score = 0;
+    wrongAnswers = [];
+    updateScore();
+    showQuestion();
+    openFullscreen();
+}
+
+function showQuestion() {
+    if (currentQuestion >= quizData.length) {
+        endQuiz();
+        return;
+    }
+
+    timeLeft = 30;
+    updateTimer();
+    startTimer();
+
+    const q = quizData[currentQuestion];
+    questionEl.innerText = `${q.id}. ${q.question}`; // Show serial from JSON
+    adjustFontSize(questionEl, q.question, 6);
+
+    optionsEl.innerHTML = "";
+    q.options.forEach((option, index) => {
+        const btn = document.createElement("div");
+        btn.classList.add("option");
+        btn.innerText = option;
+        adjustFontSize(btn, option, 4);
+        btn.addEventListener("click", () => selectAnswer(index));
+        optionsEl.appendChild(btn);
+    });
+
+    currentQuestionEl.innerText = currentQuestion + 1;
+    progressBar.style.width = ((currentQuestion / quizData.length) * 100) + "%";
+}
+
+// Dynamic font adjustment
+function adjustFontSize(el, text, maxSize) {
+    let size = maxSize - Math.floor(text.length / 25);
+    if (size < 3) size = 3;
+    el.style.fontSize = size + "vw";
+}
+
+function selectAnswer(index) {
+    stopTimer();
+    const q = quizData[currentQuestion];
+    const optionEls = document.querySelectorAll(".option");
+
+    if (index === q.answer) {
+        optionEls[index].classList.add("correct");
+        score++;
+    } else {
+        optionEls[index].classList.add("wrong");
+        optionEls[q.answer].classList.add("correct");
+        wrongAnswers.push(q);
+    }
+
+    updateScore();
+    setTimeout(() => {
+        currentQuestion++;
+        showQuestion();
+    }, 1000);
+}
+
+function updateScore() { scoreEl.innerText = `Score: ${score}`; }
+
+function startTimer() {
+    timerBar.style.width = "100%";
+    timer = setInterval(() => {
+        if (!paused) {
+            timeLeft--;
+            timerBar.style.width = (timeLeft / 30 * 100) + "%";
+            if (timeLeft <= 0) {
+                stopTimer();
+                wrongAnswers.push(quizData[currentQuestion]);
+                currentQuestion++;
+                showQuestion();
+            }
+        }
+    }, 1000);
+}
+
+function stopTimer() { clearInterval(timer); }
+function updateTimer() { timerBar.style.width = "100%"; }
+function pauseQuiz() { paused = true; }
+function resumeQuiz() { paused = false; }
+function stopQuiz() { stopTimer(); endQuiz(); }
+
+function endQuiz() {
+    quizContainer.style.display = "none";
+    resultScreen.style.display = "flex";
+    finalScore.innerText = `${score} / ${quizData.length}`;
+    if(wrongAnswers.length > 0){
+        wrongSummary.innerText = `Wrong Answers: ${wrongAnswers.length} / ${quizData.length}`;
+    } else {
+        wrongSummary.innerText = "";
+    }
+}
+
+function restartQuiz() {
+    resultScreen.style.display = "none";
+    startScreen.style.display = "flex";
+}
+
+function retryWrong() {
+    if (wrongAnswers.length === 0) return;
+    quizData.splice(0, quizData.length, ...wrongAnswers);
+    resultScreen.style.display = "none";
+    quizContainer.style.display = "block";
+    currentQuestion = 0;
+    score = 0;
+    wrongAnswers = [];
+    updateScore();
+    showQuestion();
+}
+
+function openFullscreen() {
+    const elem = document.documentElement;
+    if (elem.requestFullscreen) { elem.requestFullscreen(); }
+    else if (elem.webkitRequestFullscreen) { elem.webkitRequestFullscreen(); }
+    else if (elem.msRequestFullscreen) { elem.msRequestFullscreen(); }
+}
+</script>
+
+</body>
+</html>

@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Full-Screen MCQ Quiz</title>
+<style>
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #1a1a1a;
+    font-family: Arial, sans-serif;
+    color: #fff;
+    overflow: hidden;
+}
+
+#quiz-container {
+    display: none;
+    width: 100%;
+    height: 100%;
+    position: relative;
+}
+
+.question {
+    text-align: center;
+    margin: 3% auto;
+    word-wrap: break-word;
+    font-weight: bold;
+}
+
+.options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 3%;
+    width: 85%;
+    height: 60%;
+    margin: 0 auto;
+}
+
+.option {
+    background-color: #333;
+    border: 2px solid #00ffff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold;
+    font-size: 4vw;
+    cursor: pointer;
+    text-align: center;
+    padding: 1%;
+    border-radius: 10px;
+    transition: 0.3s;
+}
+
+.option.correct { background-color: #00cc00; color: #000; }
+.option.wrong { background-color: #cc0000; color: #000; }
+
+.top-bar {
+    width: 100%;
+    height: 60px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 2%;
+    box-sizing: border-box;
+    font-size: 1.8vw;
+}
+
+.progress-container, .timer-container {
+    width: 35%;
+    background: #333;
+    border-radius: 25px;
+    overflow: hidden;
+}
+
+.progress-bar, .timer-bar {
+    height: 25px;
+    width: 0;
+    background-color: #00ffff;
+    transition: width 0.3s;
+}
+
+.score { color: #00ff00; }
+
+.control-buttons {
+    position: absolute;
+    top: 50%;
+    right: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.control-buttons button {
+    background-color: #333;
+    border: 2px solid #00ffff;
+    color: #fff;
+    font-weight: bold;
+    cursor: pointer;
+    border-radius: 10px;
+    transition: 0.3s;
+    padding: 10px 15px;
+    text-align: center;
+}
+
+#start-screen, #result-screen {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+    flex-direction: column;
+}
+
+#start-screen button, #result-screen button {
+    font-size: 3.5vw;
+    padding: 15px 30px;
+    cursor: pointer;
+    border-radius: 15px;
+    border: none;
+    background-color: #00ffff;
+    color: #000;
+    margin-top: 20px;
+}
+</style>
+</head>
+<body>
+
+<div id="start-screen">
+    <h1>Welcome to the Quiz!</h1>
+    <button onclick="startQuiz()">Start Quiz</button>
+</div>
+
+<div id="quiz-container">
+    <div class="top-bar">
+        <div>Q No: <span id="current-question">1</span> / <span id="total-questions"></span></div>
+        <div class="progress-container">
+            <div class="progress-bar" id="progress-bar"></div>
+        </div>
+        <div class="timer-container">
+            <div class="timer-bar" id="timer-bar"></div>
+        </div>
+        <div class="score" id="score">Score: 0</div>
+    </div>
+
+    <div class="question" id="question"></div>
+    <div class="options" id="options"></div>
+
+    <div class="control-buttons">
+        <button id="pause-btn" onclick="pauseQuiz()">Pause</button>
+        <button id="resume-btn" onclick="resumeQuiz()">Resume</button>
+        <button id="stop-btn" onclick="stopQuiz()">Stop</button>
+    </div>
+</div>
+
+<div id="result-screen">
+    <h1>Your Score: <span id="final-score"></span></h1>
+    <h2 id="wrong-summary"></h2>
+    <button onclick="retryWrong()">Retry Wrong Answers</button>
+    <button onclick="restartQuiz()">Restart Quiz</button>
+</div>
+
+<script>
+// JSON formatted questions
+const quizData = [
+  {
+    "id": 1,
+    "question": "শব্দ ও ধাতুর পরে যুক্ত হওয়া অর্থহীন শব্দাংশকে কী বলে?",
+    "options": [
+      "উপসর্গ",
+      "বিভক্তি",
+      "প্রত্যয়",
+      "শব্দমূল"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 2,
+    "question": "'বাঘা' এবং 'দৈনিক' শব্দ দুটিতে ব্যবহৃত 'আ' ও 'ইক' কীসের উদাহরণ?",
+    "options": [
+      "কৃৎপ্রত্যয়",
+      "তদ্ধিত প্রত্যয়",
+      "উপসর্গ",
+      "বিভক্তি"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 3,
+    "question": "শব্দের পরে যেসব প্রত্যয় যুক্ত হয়, সেগুলোকে কী বলে?",
+    "options": [
+      "কৃৎপ্রত্যয়",
+      "তদ্ধিত প্রত্যয়",
+      "উপসর্গ",
+      "বিভক্তি"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 4,
+    "question": "তদ্ধিত প্রত্যয় দিয়ে সাধিত শব্দকে কী বলা হয়?",
+    "options": [
+      "কৃদন্ত শব্দ",
+      "শব্দমূল",
+      "সাধিত শব্দ",
+      "তদ্ধিতান্ত শব্দ"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 5,
+    "question": "ধাতুর পরে যেসব প্রত্যয় যুক্ত হয়, সেগুলোকে কী বলে?",
+    "options": [
+      "তদ্ধিত প্রত্যয়",
+      "উপসর্গ",
+      "কৃৎপ্রত্যয়",
+      "বিভক্তি"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 6,
+    "question": "কৃৎপ্রত্যয় দিয়ে সাধিত শব্দকে কী বলা হয়?",
+    "options": [
+      "তদ্ধিতান্ত শব্দ",
+      "কৃদন্ত শব্দ",
+      "শব্দমূল",
+      "সাধিত শব্দ"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 7,
+    "question": "'দোলনা' ও 'কর্তব্য' কী ধরনের শব্দ?",
+    "options": [
+      "তদ্ধিতান্ত শব্দ",
+      "কৃদন্ত শব্দ",
+      "শব্দমূল",
+      "সাধিত শব্দ"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 8,
+    "question": "প্রত্যয়ের নিজস্ব কী নেই?",
+    "options": [
+      "অর্থ",
+      "ব্যবহার",
+      "দ্যোতনা",
+      "প্রকারভেদ"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 9,
+    "question": "প্রত্যয় যুক্ত হওয়ার পর শব্দের কীসের পরিবর্তন হতে পারে?",
+    "options": [
+      "অর্থ ও শ্রেণিপরিচয়",
+      "ব্যবহার",
+      "শুধুমাত্র অর্থ",
+      "শুধুমাত্র শ্রেণিপরিচয়"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 10,
+    "question": "'শিশু+অ' থেকে গঠিত সাধিত শব্দ কোনটি?",
+    "options": [
+      "শৈশব",
+      "শিশুত্ব",
+      "শৈশবী",
+      "শৈশবে"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 11,
+    "question": "'শৈশব' শব্দে ব্যবহৃত প্রত্যয়টি কোন ধরনের?",
+    "options": [
+      "কৃৎ",
+      "তদ্ধিত",
+      "উপসর্গ",
+      "বিভক্তি"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 12,
+    "question": "'জি+অ' থেকে গঠিত সাধিত শব্দ কোনটি?",
+    "options": [
+      "জিও",
+      "জিয়",
+      "জয়",
+      "জিতা"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 13,
+    "question": "'জয়' শব্দে ব্যবহৃত প্রত্যয়টি কোন ধরনের?",
+    "options": [
+      "কৃৎ",
+      "তদ্ধিত",
+      "উপসর্গ",
+      "বিভক্তি"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 14,
+    "question": "'পঠ+অক' থেকে গঠিত সাধিত শব্দ কোনটি?",
+    "options": [
+      "পঠক",
+      "পাঠক",
+      "পঠিত",
+      "পাঠ"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 15,
+    "question": "'পাঠক' শব্দে ব্যবহৃত প্রত্যয়টি কোন ধরনের?",
+    "options": [
+      "তদ্ধিত",
+      "কৃৎ",
+      "উপসর্গ",
+      "বিভক্তি"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 16,
+    "question": "'নিন্দ্‌+অক' থেকে গঠিত সাধিত শব্দ কোনটি?",
+    "options": [
+      "নিন্দ",
+      "নিন্দক",
+      "নিন্দা",
+      "নিন্দনীয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 17,
+    "question": "'নিন্দক' শব্দে ব্যবহৃত প্রত্যয়টি কোন ধরনের?",
+    "options": [
+      "তদ্ধিত",
+      "কৃৎ",
+      "উপসর্গ",
+      "বিভক্তি"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 18,
+    "question": "'দাপ+অট' থেকে গঠিত সাধিত শব্দ কোনটি?",
+    "options": [
+      "দাপট",
+      "দাপানো",
+      "দাপ",
+      "দাপাট"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 19,
+    "question": "'দাপট' শব্দে ব্যবহৃত প্রত্যয়টি কোন ধরনের?",
+    "options": [
+      "কৃৎ",
+      "তদ্ধিত",
+      "উপসর্গ",
+      "বিভক্তি"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 20,
+    "question": "'কপ্+অট' থেকে গঠিত সাধিত শব্দ কোনটি?",
+    "options": [
+      "কপাট",
+      "কপট",
+      "কপটা",
+      "কপটতা"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 21,
+    "question": "'কপট' শব্দে ব্যবহৃত প্রত্যয়টি কোন ধরনের?",
+    "options": [
+      "তদ্ধিত",
+      "কৃৎ",
+      "উপসর্গ",
+      "বিভক্তি"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 22,
+    "question": "'দুল্+অনা' থেকে গঠিত সাধিত শব্দ কোনটি?",
+    "options": [
+      "দুলনা",
+      "দুলানো",
+      "দোলনা",
+      "দোলান"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 23,
+    "question": "'দোলনা' শব্দে ব্যবহৃত প্রত্যয়টি কোন ধরনের?",
+    "options": [
+      "তদ্ধিত",
+      "কৃৎ",
+      "উপসর্গ",
+      "বিভক্তি"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 24,
+    "question": "'খেল্+অনা' থেকে গঠিত সাধিত শব্দ কোনটি?",
+    "options": [
+      "খেলানো",
+      "খেলন",
+      "খেলনা",
+      "খেলা"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 25,
+    "question": "'খেলনা' শব্দে ব্যবহৃত প্রত্যয়টি কোন ধরনের?",
+    "options": [
+      "তদ্ধিত",
+      "কৃৎ",
+      "উপসর্গ",
+      "বিভক্তি"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 26,
+    "question": "'দৃশ+অনীয়' থেকে গঠিত সাধিত শব্দ কোনটি?",
+    "options": [
+      "দৃশ্য",
+      "দর্শনীয়",
+      "দর্শনীয়",
+      "দৃশ্যানু"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 27,
+    "question": "'দর্শনীয়' শব্দে ব্যবহৃত প্রত্যয়টি কোন ধরনের?",
+    "options": [
+      "তদ্ধিত",
+      "কৃৎ",
+      "উপসর্গ",
+      "বিভক্তি"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 28,
+    "question": "'উড্+অন্ত' থেকে গঠিত সাধিত শব্দ কোনটি?",
+    "options": [
+      "উড়ানো",
+      "উড়ন্ত",
+      "উড়া",
+      "উড্ডয়ন"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 29,
+    "question": "'উড়ন্ত' শব্দে ব্যবহৃত প্রত্যয়টি কোন ধরনের?",
+    "options": [
+      "তদ্ধিত",
+      "কৃৎ",
+      "উপসর্গ",
+      "বিভক্তি"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 30,
+    "question": "'মহ+অন্ত' থেকে গঠিত সাধিত শব্দ কোনটি?",
+    "options": [
+      "মহান্ত",
+      "মহান",
+      "মহৎ",
+      "মহন্ত"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 31,
+    "question": "'মহন্ত' শব্দে ব্যবহৃত প্রত্যয়টি কোন ধরনের?",
+    "options": [
+      "তদ্ধিত",
+      "কৃৎ",
+      "উপসর্গ",
+      "বিভক্তি"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 32,
+    "question": "'কর্দ+অম' থেকে গঠিত সাধিত শব্দ কোনটি?",
+    "options": [
+      "কর্দম",
+      "কর্দমীয়",
+      "কর্দম",
+      "কর্দান"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 33,
+    "question": "'কর্দম' শব্দে ব্যবহৃত প্রত্যয়টি কোন ধরনের?",
+    "options": [
+      "কৃৎ",
+      "তদ্ধিত",
+      "উপসর্গ",
+      "বিভক্তি"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 34,
+    "question": "'চর্+অম' থেকে গঠিত সাধিত শব্দ কোনটি?",
+    "options": [
+      "চর্ম",
+      "চর্মীয়",
+      "চরম",
+      "চর্মা"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 35,
+    "question": "'চর্ম' শব্দে ব্যবহৃত প্রত্যয়টি কোন ধরনের?",
+    "options": [
+      "কৃৎ",
+      "তদ্ধিত",
+      "উপসর্গ",
+      "বিভক্তি"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 36,
+    "question": "'বৃষ্+তি' থেকে গঠিত সাধিত শব্দ কোনটি?",
+    "options": [
+      "বৃষ্টি",
+      "বৃষ্টি",
+      "বৃষটি",
+      "বৃষট"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 37,
+    "question": "'বৃষ্টি' শব্দে ব্যবহৃত প্রত্যয়টি কোন ধরনের?",
+    "options": [
+      "তদ্ধিত",
+      "কৃৎ",
+      "উপসর্গ",
+      "বিভক্তি"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 38,
+    "question": "'রাজা+কীয়' থেকে গঠিত সাধিত শব্দ কোনটি?",
+    "options": [
+      "রাজকীয়",
+      "রাজকীয়",
+      "রাজা",
+      "রজা"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 39,
+    "question": "'রাজকীয়' শব্দে ব্যবহৃত প্রত্যয়টি কোন ধরনের?",
+    "options": [
+      "কৃৎ",
+      "তদ্ধিত",
+      "উপসর্গ",
+      "বিভক্তি"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 40,
+    "question": "'রাজা+ত্ব' থেকে গঠিত সাধিত শব্দ কোনটি?",
+    "options": [
+      "রাজত্ব",
+      "রাজা",
+      "রাজত্ব",
+      "রাজত্ব"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 41,
+    "question": "'রাজত্ব' শব্দে ব্যবহৃত প্রত্যয়টি কোন ধরনের?",
+    "options": [
+      "তদ্ধিত",
+      "কৃৎ",
+      "উপসর্গ",
+      "বিভক্তি"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 42,
+    "question": "'দান+ই' থেকে গঠিত সাধিত শব্দ কোনটি?",
+    "options": [
+      "দানী",
+      "দানী",
+      "দান",
+      "দানা"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 43,
+    "question": "'দানী' শব্দে ব্যবহৃত প্রত্যয়টি কোন ধরনের?",
+    "options": [
+      "কৃৎ",
+      "তদ্ধিত",
+      "উপসর্গ",
+      "বিভক্তি"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 44,
+    "question": "'হরিণ+ই' থেকে গঠিত সাধিত শব্দ কোনটি?",
+    "options": [
+      "হরিণী",
+      "হরিণী",
+      "হরিণা",
+      "হরি"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 45,
+    "question": "'হরিণী' শব্দে ব্যবহৃত প্রত্যয়টি কোন ধরনের?",
+    "options": [
+      "তদ্ধিত",
+      "কৃৎ",
+      "উপসর্গ",
+      "বিভক্তি"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 46,
+    "question": "'হাস+ই' থেকে গঠিত সাধিত শব্দ কোনটি?",
+    "options": [
+      "হাসা",
+      "হাসি",
+      "হাস",
+      "হাসী"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 47,
+    "question": "'হাসি' শব্দে ব্যবহৃত প্রত্যয়টি কোন ধরনের?",
+    "options": [
+      "তদ্ধিত",
+      "কৃৎ",
+      "উপসর্গ",
+      "বিভক্তি"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 48,
+    "question": "'গাড়ি+আন' থেকে গঠিত সাধিত শব্দ কোনটি?",
+    "options": [
+      "গাড়িয়ান",
+      "গাড়োয়ান",
+      "গাড়োআন",
+      "গাড়ানো"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 49,
+    "question": "'গাড়োয়ান' শব্দে ব্যবহৃত প্রত্যয়টি কোন ধরনের?",
+    "options": [
+      "কৃৎ",
+      "তদ্ধিত",
+      "উপসর্গ",
+      "বিভক্তি"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 50,
+    "question": "'শিশ+আন' থেকে গঠিত সাধিত শব্দ কোনটি?",
+    "options": [
+      "শিয়ান",
+      "শয়ান",
+      "শায়ান",
+      "শিয়ানো"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 51,
+    "question": "'শয়ান' শব্দে ব্যবহৃত প্রত্যয়টি কোন ধরনের?",
+    "options": [
+      "তদ্ধিত",
+      "কৃৎ",
+      "উপসর্গ",
+      "বিভক্তি"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 52,
+    "question": "'বাবু+আনি' থেকে গঠিত সাধিত শব্দ কোনটি?",
+    "options": [
+      "বাবুন",
+      "বাবুয়ানা",
+      "বাবুয়ানি",
+      "বাবুয়ানো"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 53,
+    "question": "'বাবুয়ানি' শব্দে ব্যবহৃত প্রত্যয়টি কোন ধরনের?",
+    "options": [
+      "কৃৎ",
+      "তদ্ধিত",
+      "উপসর্গ",
+      "বিভক্তি"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 54,
+    "question": "'শুন+আনি' থেকে গঠিত সাধিত শব্দ কোনটি?",
+    "options": [
+      "শুনানি",
+      "শুনানি",
+      "শুনানো",
+      "শুনা"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 55,
+    "question": "'শুনানি' শব্দে ব্যবহৃত প্রত্যয়টি কোন ধরনের?",
+    "options": [
+      "তদ্ধিত",
+      "কৃৎ",
+      "উপসর্গ",
+      "বিভক্তি"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 56,
+    "question": "'শুনানি' শব্দে ব্যবহৃত প্রত্যয়টি কোন ধরনের?",
+    "options": [
+      "তদ্ধিত",
+      "কৃৎ",
+      "উপসর্গ",
+      "বিভক্তি"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 57,
+    "question": "'শুনানি' শব্দে ব্যবহৃত প্রত্যয়টি কোন ধরনের?",
+    "options": [
+      "তদ্ধিত",
+      "কৃৎ",
+      "উপসর্গ",
+      "বিভক্তি"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 58,
+    "question": "'শুনানি' শব্দে ব্যবহৃত প্রত্যয়টি কোন ধরনের?",
+    "options": [
+      "তদ্ধিত",
+      "কৃৎ",
+      "উপসর্গ",
+      "বিভক্তি"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 59,
+    "question": "'শুনানি' শব্দে ব্যবহৃত প্রত্যয়টি কোন ধরনের?",
+    "options": [
+      "তদ্ধিত",
+      "কৃৎ",
+      "উপসর্গ",
+      "বিভক্তি"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 60,
+    "question": "'শুনানি' শব্দে ব্যবহৃত প্রত্যয়টি কোন ধরনের?",
+    "options": [
+      "তদ্ধিত",
+      "কৃৎ",
+      "উপসর্গ",
+      "বিভক্তি"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 61,
+    "question": "'শুনানি' শব্দে ব্যবহৃত প্রত্যয়টি কোন ধরনের?",
+    "options": [
+      "তদ্ধিত",
+      "কৃৎ",
+      "উপসর্গ",
+      "বিভক্তি"
+    ],
+    "answer": 1
+  }
+];
+
+let currentQuestion = 0;
+let score = 0;
+let wrongAnswers = [];
+let timer;
+let timeLeft = 30;
+let paused = false;
+
+const questionEl = document.getElementById("question");
+const optionsEl = document.getElementById("options");
+const progressBar = document.getElementById("progress-bar");
+const timerBar = document.getElementById("timer-bar");
+const scoreEl = document.getElementById("score");
+const currentQuestionEl = document.getElementById("current-question");
+const totalQuestionsEl = document.getElementById("total-questions");
+const quizContainer = document.getElementById("quiz-container");
+const startScreen = document.getElementById("start-screen");
+const resultScreen = document.getElementById("result-screen");
+const finalScore = document.getElementById("final-score");
+const wrongSummary = document.getElementById("wrong-summary");
+
+totalQuestionsEl.innerText = quizData.length;
+
+function startQuiz() {
+    startScreen.style.display = "none";
+    quizContainer.style.display = "block";
+    currentQuestion = 0;
+    score = 0;
+    wrongAnswers = [];
+    updateScore();
+    showQuestion();
+    openFullscreen();
+}
+
+function showQuestion() {
+    if (currentQuestion >= quizData.length) {
+        endQuiz();
+        return;
+    }
+
+    timeLeft = 30;
+    updateTimer();
+    startTimer();
+
+    const q = quizData[currentQuestion];
+    questionEl.innerText = `${q.id}. ${q.question}`; // Show serial from JSON
+    adjustFontSize(questionEl, q.question, 6);
+
+    optionsEl.innerHTML = "";
+    q.options.forEach((option, index) => {
+        const btn = document.createElement("div");
+        btn.classList.add("option");
+        btn.innerText = option;
+        adjustFontSize(btn, option, 4);
+        btn.addEventListener("click", () => selectAnswer(index));
+        optionsEl.appendChild(btn);
+    });
+
+    currentQuestionEl.innerText = currentQuestion + 1;
+    progressBar.style.width = ((currentQuestion / quizData.length) * 100) + "%";
+}
+
+// Dynamic font adjustment
+function adjustFontSize(el, text, maxSize) {
+    let size = maxSize - Math.floor(text.length / 25);
+    if (size < 3) size = 3;
+    el.style.fontSize = size + "vw";
+}
+
+function selectAnswer(index) {
+    stopTimer();
+    const q = quizData[currentQuestion];
+    const optionEls = document.querySelectorAll(".option");
+
+    if (index === q.answer) {
+        optionEls[index].classList.add("correct");
+        score++;
+    } else {
+        optionEls[index].classList.add("wrong");
+        optionEls[q.answer].classList.add("correct");
+        wrongAnswers.push(q);
+    }
+
+    updateScore();
+    setTimeout(() => {
+        currentQuestion++;
+        showQuestion();
+    }, 1000);
+}
+
+function updateScore() { scoreEl.innerText = `Score: ${score}`; }
+
+function startTimer() {
+    timerBar.style.width = "100%";
+    timer = setInterval(() => {
+        if (!paused) {
+            timeLeft--;
+            timerBar.style.width = (timeLeft / 30 * 100) + "%";
+            if (timeLeft <= 0) {
+                stopTimer();
+                wrongAnswers.push(quizData[currentQuestion]);
+                currentQuestion++;
+                showQuestion();
+            }
+        }
+    }, 1000);
+}
+
+function stopTimer() { clearInterval(timer); }
+function updateTimer() { timerBar.style.width = "100%"; }
+function pauseQuiz() { paused = true; }
+function resumeQuiz() { paused = false; }
+function stopQuiz() { stopTimer(); endQuiz(); }
+
+function endQuiz() {
+    quizContainer.style.display = "none";
+    resultScreen.style.display = "flex";
+    finalScore.innerText = `${score} / ${quizData.length}`;
+    if(wrongAnswers.length > 0){
+        wrongSummary.innerText = `Wrong Answers: ${wrongAnswers.length} / ${quizData.length}`;
+    } else {
+        wrongSummary.innerText = "";
+    }
+}
+
+function restartQuiz() {
+    resultScreen.style.display = "none";
+    startScreen.style.display = "flex";
+}
+
+function retryWrong() {
+    if (wrongAnswers.length === 0) return;
+    quizData.splice(0, quizData.length, ...wrongAnswers);
+    resultScreen.style.display = "none";
+    quizContainer.style.display = "block";
+    currentQuestion = 0;
+    score = 0;
+    wrongAnswers = [];
+    updateScore();
+    showQuestion();
+}
+
+function openFullscreen() {
+    const elem = document.documentElement;
+    if (elem.requestFullscreen) { elem.requestFullscreen(); }
+    else if (elem.webkitRequestFullscreen) { elem.webkitRequestFullscreen(); }
+    else if (elem.msRequestFullscreen) { elem.msRequestFullscreen(); }
+}
+</script>
+
+</body>
+</html>

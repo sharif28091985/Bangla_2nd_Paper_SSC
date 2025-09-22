@@ -1,0 +1,1421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Full-Screen MCQ Quiz</title>
+<style>
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #1a1a1a;
+    font-family: Arial, sans-serif;
+    color: #fff;
+    overflow: hidden;
+}
+
+#quiz-container {
+    display: none;
+    width: 100%;
+    height: 100%;
+    position: relative;
+}
+
+.question {
+    text-align: center;
+    margin: 3% auto;
+    word-wrap: break-word;
+    font-weight: bold;
+}
+
+.options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 3%;
+    width: 85%;
+    height: 60%;
+    margin: 0 auto;
+}
+
+.option {
+    background-color: #333;
+    border: 2px solid #00ffff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold;
+    font-size: 4vw;
+    cursor: pointer;
+    text-align: center;
+    padding: 1%;
+    border-radius: 10px;
+    transition: 0.3s;
+}
+
+.option.correct { background-color: #00cc00; color: #000; }
+.option.wrong { background-color: #cc0000; color: #000; }
+
+.top-bar {
+    width: 100%;
+    height: 60px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 2%;
+    box-sizing: border-box;
+    font-size: 1.8vw;
+}
+
+.progress-container, .timer-container {
+    width: 35%;
+    background: #333;
+    border-radius: 25px;
+    overflow: hidden;
+}
+
+.progress-bar, .timer-bar {
+    height: 25px;
+    width: 0;
+    background-color: #00ffff;
+    transition: width 0.3s;
+}
+
+.score { color: #00ff00; }
+
+.control-buttons {
+    position: absolute;
+    top: 50%;
+    right: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.control-buttons button {
+    background-color: #333;
+    border: 2px solid #00ffff;
+    color: #fff;
+    font-weight: bold;
+    cursor: pointer;
+    border-radius: 10px;
+    transition: 0.3s;
+    padding: 10px 15px;
+    text-align: center;
+}
+
+#start-screen, #result-screen {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+    flex-direction: column;
+}
+
+#start-screen button, #result-screen button {
+    font-size: 3.5vw;
+    padding: 15px 30px;
+    cursor: pointer;
+    border-radius: 15px;
+    border: none;
+    background-color: #00ffff;
+    color: #000;
+    margin-top: 20px;
+}
+</style>
+</head>
+<body>
+
+<div id="start-screen">
+    <h1>Welcome to the Quiz!</h1>
+    <button onclick="startQuiz()">Start Quiz</button>
+</div>
+
+<div id="quiz-container">
+    <div class="top-bar">
+        <div>Q No: <span id="current-question">1</span> / <span id="total-questions"></span></div>
+        <div class="progress-container">
+            <div class="progress-bar" id="progress-bar"></div>
+        </div>
+        <div class="timer-container">
+            <div class="timer-bar" id="timer-bar"></div>
+        </div>
+        <div class="score" id="score">Score: 0</div>
+    </div>
+
+    <div class="question" id="question"></div>
+    <div class="options" id="options"></div>
+
+    <div class="control-buttons">
+        <button id="pause-btn" onclick="pauseQuiz()">Pause</button>
+        <button id="resume-btn" onclick="resumeQuiz()">Resume</button>
+        <button id="stop-btn" onclick="stopQuiz()">Stop</button>
+    </div>
+</div>
+
+<div id="result-screen">
+    <h1>Your Score: <span id="final-score"></span></h1>
+    <h2 id="wrong-summary"></h2>
+    <button onclick="retryWrong()">Retry Wrong Answers</button>
+    <button onclick="restartQuiz()">Restart Quiz</button>
+</div>
+
+<script>
+// JSON formatted questions
+const quizData = [
+  {
+    "id": 1,
+    "question": "মনের নানা ভাব বা আবেগকে প্রকাশ করা হয় যেসব শব্দ দিয়ে, সেগুলোকে কী বলে?",
+    "options": [
+      "যোজক",
+      "আবেগ শব্দ",
+      "অনুসর্গ",
+      "বিশেষণ"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 2,
+    "question": "আবেগ শব্দ বাক্যের অন্য শব্দগুলোর সঙ্গে কীভাবে সম্পর্কিত হয়?",
+    "options": [
+      "সরাসরি",
+      "পরোক্ষভাবে",
+      "আলগাভাবে বা স্বাধীনভাবে",
+      "কোনোটিই নয়"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 3,
+    "question": "'ছি ছি', 'আহা', 'বাহ্', 'শাবাশ' — এগুলো কীসের উদাহরণ?",
+    "options": [
+      "যোজক",
+      "অনুসর্গ",
+      "আবেগ শব্দ",
+      "বিশেষ্য"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 4,
+    "question": "যেসব শব্দের সাহায্যে অনুমোদন, সম্মতি, সমর্থন ইত্যাদি ভাব প্রকাশ করা হয়, সেগুলোকে কী ধরনের আবেগ শব্দ বলে?",
+    "options": [
+      "প্রশংসা আবেগ",
+      "সিদ্ধান্ত আবেগ",
+      "বিরক্তি আবেগ",
+      "বিস্ময় আবেগ"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 5,
+    "question": "'হ্যাঁ, আমাদের জিততেই হবে।' — এই বাক্যে 'হ্যাঁ' কোন ধরনের আবেগ?",
+    "options": [
+      "প্রশংসা আবেগ",
+      "সিদ্ধান্ত আবেগ",
+      "বিরক্তি আবেগ",
+      "করুণা আবেগ"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 6,
+    "question": "'বেশ, তবে যাওয়াই যাক।' — এই বাক্যে 'বেশ' কোন ধরনের আবেগ?",
+    "options": [
+      "বিস্ময় আবেগ",
+      "সিদ্ধান্ত আবেগ",
+      "বিরক্তি আবেগ",
+      "করুণা আবেগ"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 7,
+    "question": "যেসব শব্দ প্রশংসা বা তারিফের মনোভাব প্রকাশে ব্যবহৃত হয়, সেগুলোকে কী বলে?",
+    "options": [
+      "সিদ্ধান্ত আবেগ",
+      "বিরক্তি আবেগ",
+      "প্রশংসা আবেগ",
+      "আতঙ্ক আবেগ"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 8,
+    "question": "'শাবাশ! এমন খেলাই তো চেয়েছিলাম।' — এই বাক্যে 'শাবাশ' কোন ধরনের আবেগ?",
+    "options": [
+      "সিদ্ধান্ত আবেগ",
+      "প্রশংসা আবেগ",
+      "বিরক্তি আবেগ",
+      "বিস্ময় আবেগ"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 9,
+    "question": "'বাহ, চমৎকার লিখেছ।' — এই বাক্যে 'বাহ' কোন ধরনের আবেগ?",
+    "options": [
+      "বিরক্তি আবেগ",
+      "প্রশংসা আবেগ",
+      "বিস্ময় আবেগ",
+      "করুণা আবেগ"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 10,
+    "question": "যেসব শব্দ অবজ্ঞা, ঘৃণা, বিরক্তি ইত্যাদি মনোভাব প্রকাশে ব্যবহৃত হয়, সেগুলোকে কী বলে?",
+    "options": [
+      "আতঙ্ক আবেগ",
+      "বিস্ময় আবেগ",
+      "বিরক্তি আবেগ",
+      "করুণা আবেগ"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 11,
+    "question": "'ছি ছি! এরকম কথা তার মুখে মানায় না।' — এই বাক্যে 'ছি ছি' কোন ধরনের আবেগ?",
+    "options": [
+      "প্রশংসা আবেগ",
+      "বিরক্তি আবেগ",
+      "আতঙ্ক আবেগ",
+      "বিস্ময় আবেগ"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 12,
+    "question": "'জ্বালা। তোমাকে নিয়ে আর পারি না।' — এই বাক্যে 'জ্বালা' কোন ধরনের আবেগ?",
+    "options": [
+      "বিরক্তি আবেগ",
+      "আতঙ্ক আবেগ",
+      "বিস্ময় আবেগ",
+      "করুণা আবেগ"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 13,
+    "question": "যেসব আবেগ-শব্দ আতঙ্ক, যন্ত্রণা, কাতরতা ইত্যাদি প্রকাশ করে, সেগুলোকে কী বলে?",
+    "options": [
+      "বিরক্তি আবেগ",
+      "আতঙ্ক আবেগ",
+      "বিস্ময় আবেগ",
+      "করুণা আবেগ"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 14,
+    "question": "'উহ, কী বিপদে পড়া গেল।' — এই বাক্যে 'উহ' কোন ধরনের আবেগ?",
+    "options": [
+      "বিরক্তি আবেগ",
+      "আতঙ্ক আবেগ",
+      "বিস্ময় আবেগ",
+      "করুণা আবেগ"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 15,
+    "question": "'বাপরে বাপ। কী ভয়ঙ্কর ছিল রাক্ষসটা।' — এই বাক্যে 'বাপরে বাপ' কোন ধরনের আবেগ?",
+    "options": [
+      "প্রশংসা আবেগ",
+      "বিরক্তি আবেগ",
+      "আতঙ্ক আবেগ",
+      "বিস্ময় আবেগ"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 16,
+    "question": "যেসব শব্দ বিস্মিত বা আশ্চর্য হওয়ার ভাব প্রকাশ করে, সেগুলোকে কী বলে?",
+    "options": [
+      "আতঙ্ক আবেগ",
+      "বিস্ময় আবেগ",
+      "করুণা আবেগ",
+      "সম্বোধন আবেগ"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 17,
+    "question": "'আরে। তুমি আবার কখন এলে?' — এই বাক্যে 'আরে' কোন ধরনের আবেগ?",
+    "options": [
+      "বিরক্তি আবেগ",
+      "বিস্ময় আবেগ",
+      "করুণা আবেগ",
+      "সম্বোধন আবেগ"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 18,
+    "question": "'আহ্, কী চমৎকার দৃশ্য।' — এই বাক্যে 'আহ্' কোন ধরনের আবেগ?",
+    "options": [
+      "প্রশংসা আবেগ",
+      "বিস্ময় আবেগ",
+      "করুণা আবেগ",
+      "সম্বোধন আবেগ"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 19,
+    "question": "যেসব শব্দ করুণা, মায়া, সহানুভূতি ইত্যাদি মনোভাব প্রকাশ করে, সেগুলোকে কী বলে?",
+    "options": [
+      "আতঙ্ক আবেগ",
+      "বিস্ময় আবেগ",
+      "করুণা আবেগ",
+      "সম্বোধন আবেগ"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 20,
+    "question": "'আহা! বেচারার এত কষ্ট।' —এই বাক্যে 'আহা' কোন ধরনের আবেগ?",
+    "options": [
+      "আতঙ্ক আবেগ",
+      "বিস্ময় আবেগ",
+      "করুণা আবেগ",
+      "সম্বোধন আবেগ"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 21,
+    "question": "'হায় হায়! ওর এখন কী হবে।' — এই বাক্যে 'হায় হায়' কোন ধরনের আবেগ?",
+    "options": [
+      "বিরক্তি আবেগ",
+      "বিস্ময় আবেগ",
+      "করুণা আবেগ",
+      "সম্বোধন আবেগ"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 22,
+    "question": "যেসব শব্দ সম্বোধন বা আহ্বান করার ক্ষেত্রে ব্যবহৃত হয়, সেগুলোকে কী বলে?",
+    "options": [
+      "বিস্ময় আবেগ",
+      "করুণা আবেগ",
+      "সম্বোধন আবেগ",
+      "অলংকার আবেগ"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 23,
+    "question": "'হে বন্ধু,তোমাকে অভিনন্দন।' — এই বাক্যে 'হে বন্ধু' কোন ধরনের আবেগ?",
+    "options": [
+      "করুণা আবেগ",
+      "সম্বোধন আবেগ",
+      "অলংকার আবেগ",
+      "সিদ্ধান্ত আবেগ"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 24,
+    "question": "'ওগো, তোরা জয়ধ্বনি করো।' — এই বাক্যে 'ওগো' কোন ধরনের আবেগ?",
+    "options": [
+      "বিস্ময় আবেগ",
+      "করুণা আবেগ",
+      "সম্বোধন আবেগ",
+      "অলংকার আবেগ"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 25,
+    "question": "যেসব শব্দ বাক্যের অর্থের পরিবর্তন না ঘটিয়ে অলংকার হিসেবে ব্যবহৃত হয়, সেগুলোকে কী বলে?",
+    "options": [
+      "করুণা আবেগ",
+      "সম্বোধন আবেগ",
+      "অলংকার আবেগ",
+      "সিদ্ধান্ত আবেগ"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 26,
+    "question": "'দুর! এ কথা কি বলতে আছে?' — এই বাক্যে 'দুর' কোন ধরনের আবেগ?",
+    "options": [
+      "বিরক্তি আবেগ",
+      "অলংকার আবেগ",
+      "বিস্ময় আবেগ",
+      "করুণা আবেগ"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 27,
+    "question": "'যাকগে, ওসব কথা থাক।' — এই বাক্যে 'যাকগে' কোন ধরনের আবেগ?",
+    "options": [
+      "বিরক্তি আবেগ",
+      "অলংকার আবেগ",
+      "বিস্ময় আবেগ",
+      "করুণা আবেগ"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 28,
+    "question": "'হ্যাঁ', 'বেশ' কোন ধরনের আবেগ?",
+    "options": [
+      "সিদ্ধান্ত আবেগ",
+      "প্রশংসা আবেগ",
+      "বিরক্তি আবেগ",
+      "আতঙ্ক আবেগ"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 29,
+    "question": "'বাহ', 'শাবাশ' কোন ধরনের আবেগ?",
+    "options": [
+      "বিরক্তি আবেগ",
+      "প্রশংসা আবেগ",
+      "আতঙ্ক আবেগ",
+      "বিস্ময় আবেগ"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 30,
+    "question": "'ছি ছি', 'জ্বালা'কোন ধরনের আবেগ?",
+    "options": [
+      "প্রশংসা আবেগ",
+      "বিরক্তি আবেগ",
+      "আতঙ্ক আবেগ",
+      "বিস্ময় আবেগ"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 31,
+    "question": "'উহ', 'বাপরে বাপ'কোন ধরনের আবেগ?",
+    "options": [
+      "বিরক্তি আবেগ",
+      "আতঙ্ক আবেগ",
+      "বিস্ময় আবেগ",
+      "করুণা আবেগ"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 32,
+    "question": "'আরে', 'আহ্' কোন ধরনের আবেগ?",
+    "options": [
+      "আতঙ্ক আবেগ",
+      "বিস্ময় আবেগ",
+      "করুণা আবেগ",
+      "সম্বোধন আবেগ"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 33,
+    "question": "'আহা', 'হায় হায়'কোন ধরনের আবেগ?",
+    "options": [
+      "বিস্ময় আবেগ",
+      "করুণা আবেগ",
+      "সম্বোধন আবেগ",
+      "অলংকার আবেগ"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 34,
+    "question": "'হে বন্ধু', 'ওগো' কোন ধরনের আবেগ?",
+    "options": [
+      "করুণা আবেগ",
+      "সম্বোধন আবেগ",
+      "অলংকার আবেগ",
+      "সিদ্ধান্ত আবেগ"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 35,
+    "question": "'দুর', 'যাকগে' কোন ধরনের আবেগ?",
+    "options": [
+      "সম্বোধন আবেগ",
+      "অলংকার আবেগ",
+      "সিদ্ধান্ত আবেগ",
+      "প্রশংসা আবেগ"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 36,
+    "question": "'আহ্' শব্দটি কোন ধরনের মনোভাব প্রকাশ করে?",
+    "options": [
+      "ঘৃণা",
+      "আতঙ্ক",
+      "বিস্ময়",
+      "করুণা"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 37,
+    "question": "'উহ' শব্দটি কোন ধরনের মনোভাব প্রকাশ করে?",
+    "options": [
+      "আতঙ্ক",
+      "বিস্ময়",
+      "বিরক্তি",
+      "প্রশংসা"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 38,
+    "question": "'ছি ছি' শব্দটি দিয়ে কোন ধরনের মনোভাব প্রকাশ করা হয়?",
+    "options": [
+      "প্রশংসা",
+      "সম্মতি",
+      "ঘৃণা",
+      "আশ্চর্য"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 39,
+    "question": "'হ্যাঁ' শব্দটি দিয়ে কোন ধরনের মনোভাব প্রকাশ করা হয়?",
+    "options": [
+      "বিরক্তি",
+      "অনুমোদন",
+      "বিস্ময়",
+      "আতঙ্ক"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 40,
+    "question": "'শাবাশ' শব্দটি দিয়ে কোন ধরনের মনোভাব প্রকাশ করা হয়?",
+    "options": [
+      "ঘৃণা",
+      "প্রশংসা",
+      "আতঙ্ক",
+      "বিস্ময়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 41,
+    "question": "'আহা' শব্দটি দিয়ে কোন ধরনের মনোভাব প্রকাশ করা হয়?",
+    "options": [
+      "বিরক্তি",
+      "প্রশংসা",
+      "করুণা",
+      "বিস্ময়"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 42,
+    "question": "'ওগো' শব্দটি দিয়ে কোন ধরনের মনোভাব প্রকাশ করা হয়?",
+    "options": [
+      "আহ্বান",
+      "বিস্ময়",
+      "করুণা",
+      "ঘৃণা"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 43,
+    "question": "'যাকগে' শব্দটি বাক্যে কী হিসেবে ব্যবহৃত হয়?",
+    "options": [
+      "অর্থের পরিবর্তনকারী হিসেবে",
+      "আলংকারিক হিসেবে",
+      "প্রধান ক্রিয়া হিসেবে",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 44,
+    "question": "'দুর' শব্দটি দিয়ে কী প্রকাশ পায়?",
+    "options": [
+      "বিরক্তি",
+      "সংশয়",
+      "মিনতি",
+      "সবগুলি"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 45,
+    "question": "আবেগ শব্দের প্রধান বৈশিষ্ট্য কী?",
+    "options": [
+      "এটি বাক্যের ক্রিয়ার সঙ্গে সরাসরি সম্পর্কিত হয়।",
+      "এটি বাক্যের অন্য পদের সঙ্গে সরাসরি সম্পর্কিত হয় না।",
+      "এটি সর্বদা বাক্যের শুরুতে বসে।",
+      "এটি সর্বদা বাক্যের শেষে বসে।"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 46,
+    "question": "আবেগ শব্দ ব্যবহারের মূল উদ্দেশ্য কী?",
+    "options": [
+      "বাক্যের গঠন পরিবর্তন করা",
+      "বাক্যের অর্থ পরিবর্তন করা",
+      "মনের ভাব বা আবেগকে প্রকাশ করা",
+      "বাক্যের সৌন্দর্য বৃদ্ধি করা"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 47,
+    "question": "কোন ধরনের আবেগ শব্দ বাক্যের কোমলতা, মাধুর্য ইত্যাদি বৈশিষ্ট্য প্রকাশ করে?",
+    "options": [
+      "সিদ্ধান্ত আবেগ",
+      "প্রশংসা আবেগ",
+      "অলংকার আবেগ",
+      "সম্বোধন আবেগ"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 48,
+    "question": "'আরে' শব্দটি দ্বারা কী প্রকাশ পায়?",
+    "options": [
+      "আতঙ্ক",
+      "করুণা",
+      "বিস্ময়",
+      "বিরক্তি"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 49,
+    "question": "'হায় হায়'শব্দটি কী ধরনের আবেগ প্রকাশ করে?",
+    "options": [
+      "আতঙ্ক",
+      "বিরক্তি",
+      "করুণা",
+      "প্রশংসা"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 50,
+    "question": "'বাহ' শব্দটি দ্বারা কী প্রকাশ পায়?",
+    "options": [
+      "তারিফ",
+      "ঘৃণা",
+      "আতঙ্ক",
+      "বিস্ময়"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 51,
+    "question": "'শাবাশ' কোন ধরনের মনোভাব প্রকাশ করে?",
+    "options": [
+      "অবজ্ঞা",
+      "ঘৃণা",
+      "প্রশংসা",
+      "বিস্ময়"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 52,
+    "question": "'করুণা আবেগ'দিয়ে কোন ধরনের ভাব প্রকাশ করা হয়?",
+    "options": [
+      "সমর্থন",
+      "অবজ্ঞা",
+      "সহানুভূতি",
+      "আতঙ্ক"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 53,
+    "question": "'হ্যাঁ' এবং 'বেশ' কোন ধরনের ভাব প্রকাশ করে?",
+    "options": [
+      "অনুমোদন এবং সম্মতি",
+      "ঘৃণা এবং বিরক্তি",
+      "আতঙ্ক এবং যন্ত্রণা",
+      "বিস্ময় এবং আশ্চর্য"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 54,
+    "question": "'ছি ছি' এবং 'জ্বালা'কোন ধরনের ভাব প্রকাশ করে?",
+    "options": [
+      "অনুমোদন এবং সমর্থন",
+      "ঘৃণা এবং বিরক্তি",
+      "আতঙ্ক এবং যন্ত্রণা",
+      "বিস্ময় এবং আশ্চর্য"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 55,
+    "question": "'উহ' এবং 'বাপরে বাপ'কোন ধরনের ভাব প্রকাশ করে?",
+    "options": [
+      "অনুমোদন এবং সমর্থন",
+      "ঘৃণা এবং বিরক্তি",
+      "আতঙ্ক এবং যন্ত্রণা",
+      "বিস্ময় এবং আশ্চর্য"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 56,
+    "question": "'আরে' এবং 'আহ্' কোন ধরনের ভাব প্রকাশ করে?",
+    "options": [
+      "অনুমোদন এবং সমর্থন",
+      "ঘৃণা এবং বিরক্তি",
+      "আতঙ্ক এবং যন্ত্রণা",
+      "বিস্ময় এবং আশ্চর্য"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 57,
+    "question": "'আহা' এবং 'হায় হায়'কোন ধরনের ভাব প্রকাশ করে?",
+    "options": [
+      "ঘৃণা এবং বিরক্তি",
+      "করুণা এবং সহানুভূতি",
+      "আতঙ্ক এবং যন্ত্রণা",
+      "বিস্ময় এবং আশ্চর্য"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 58,
+    "question": "'হে বন্ধু'এবং 'ওগো' কোন ধরনের ভাব প্রকাশ করে?",
+    "options": [
+      "আহ্বান এবং সম্বোধন",
+      "ঘৃণা এবং বিরক্তি",
+      "আতঙ্ক এবং যন্ত্রণা",
+      "বিস্ময় এবং আশ্চর্য"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 59,
+    "question": "'দুর' এবং 'যাকগে' কোন ধরনের ভাব প্রকাশ করে?",
+    "options": [
+      "ঘৃণা এবং বিরক্তি",
+      "আতঙ্ক এবং যন্ত্রণা",
+      "সংশয় এবং অনুরোধ",
+      "বিস্ময় এবং আশ্চর্য"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 60,
+    "question": "'আবেগ শব্দ'বাক্যের অন্যান্য শব্দের সঙ্গে কীভাবে ব্যবহৃত হয়?",
+    "options": [
+      "যুক্ত হয়ে",
+      "স্বাধীনভাবে",
+      "নির্ভরশীল হয়ে",
+      "সবগুলি"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 61,
+    "question": "'আহা! বেচারার এত কষ্ট।' এই বাক্যে 'আহা' শব্দটি কী প্রকাশ করছে?",
+    "options": [
+      "আনন্দ",
+      "দুঃখ",
+      "হতাশা",
+      "করুণা"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 62,
+    "question": "'হ্যাঁ, আমাদের জিততেই হবে।' এই বাক্যে 'হ্যাঁ' শব্দটি কী প্রকাশ করছে?",
+    "options": [
+      "সম্মতি",
+      "দ্বিমত",
+      "সন্দেহ",
+      "ভয়"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 63,
+    "question": "'ওগো, তোরা জয়ধ্বনি করো।' এই বাক্যে 'ওগো' শব্দটি কী প্রকাশ করছে?",
+    "options": [
+      "অনুরোধ",
+      "আদেশ",
+      "আহ্বান",
+      "ভয়"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 64,
+    "question": "'দুর! এ কথা কি বলতে আছে?'এই বাক্যে 'দুর' শব্দটি কী প্রকাশ করছে?",
+    "options": [
+      "সম্মতি",
+      "অনুরোধ",
+      "বিরক্তি",
+      "সন্দেহ"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 65,
+    "question": "'বাপরে বাপ। কী ভয়ঙ্কর ছিল রাক্ষসটা।' এই বাক্যে 'বাপরে বাপ' শব্দটি কী প্রকাশ করছে?",
+    "options": [
+      "আনন্দ",
+      "ঘৃণা",
+      "আতঙ্ক",
+      "বিস্ময়"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 66,
+    "question": "'আহ্, কী চমৎকার দৃশ্য।' এই বাক্যে 'আহ্' শব্দটি কী প্রকাশ করছে?",
+    "options": [
+      "যন্ত্রণা",
+      "বিস্ময়",
+      "বিরক্তি",
+      "ঘৃণা"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 67,
+    "question": "'ছি ছি! এরকম কথা তার মুখে মানায় না।' এই বাক্যে 'ছি ছি' শব্দটি কী প্রকাশ করছে?",
+    "options": [
+      "ঘৃণা",
+      "করুণা",
+      "বিস্ময়",
+      "অনুরোধ"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 68,
+    "question": "'শাবাশ! এমন খেলাই তো চেয়েছিলাম।'এই বাক্যে 'শাবাশ' শব্দটি কী প্রকাশ করছে?",
+    "options": [
+      "বিরক্তি",
+      "প্রশংসা",
+      "বিস্ময়",
+      "করুণা"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 69,
+    "question": "'যাকগে, ওসব কথা থাক।'এই বাক্যে 'যাকগে' শব্দটি কী প্রকাশ করছে?",
+    "options": [
+      "বিস্ময়",
+      "বিরক্তি",
+      "অনীহা",
+      "অনুরোধ"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 70,
+    "question": "'হে বন্ধু,তোমাকে অভিনন্দন।' এই বাক্যে 'হে' শব্দটি কী প্রকাশ করছে?",
+    "options": [
+      "স্নেহ",
+      "সম্বোধন",
+      "অনুরোধ",
+      "মিনতি"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 71,
+    "question": "আবেগ শব্দের একটি গুরুত্বপূর্ণ বৈশিষ্ট্য হলো, এটি বাক্যের __ এর সঙ্গে সরাসরি সম্পর্কিত হয় না।",
+    "options": [
+      "বিশেষ্য",
+      "সর্বনাম",
+      "ক্রিয়া",
+      "কোনোটিই নয়"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 72,
+    "question": "আবেগ শব্দের প্রয়োগে সাধারণত কোন ধরনের চিহ্ন ব্যবহৃত হয়?",
+    "options": [
+      "কমা (,)",
+      "প্রশ্নবোধক চিহ্ন (?)",
+      "বিস্ময়সূচক চিহ্ন (!)",
+      "সেমিকোলন (;)"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 73,
+    "question": "'বেশ, তবে যাওয়াই যাক।' এই বাক্যে 'বেশ' শব্দটি দ্বারা কী প্রকাশ পাচ্ছে?",
+    "options": [
+      "সম্মতি",
+      "অসম্মতি",
+      "দ্বিমত",
+      "বিরক্তি"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 74,
+    "question": "'জ্বালা। তোমাকে নিয়ে আর পারি না।' এই বাক্যে 'জ্বালা' শব্দটি কী অর্থে ব্যবহৃত হয়েছে?",
+    "options": [
+      "তীব্র ব্যথা",
+      "জ্বালাপোড়া",
+      "বিরক্তি",
+      "যন্ত্রণা"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 75,
+    "question": "'আরে। তুমি আবার কখন এলে?' এই বাক্যে 'আরে' দ্বারা কী বোঝানো হয়েছে?",
+    "options": [
+      "হঠাৎ আগমন",
+      "দ্রুত আগমন",
+      "অপ্রত্যাশিত আগমন",
+      "বিলম্বিত আগমন"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 76,
+    "question": "'হায় হায়! ওর এখন কী হবে।' এই বাক্যে 'হায় হায়'দ্বারা কী বোঝানো হয়েছে?",
+    "options": [
+      "আনন্দ",
+      "করুণ অবস্থা",
+      "বিস্ময়",
+      "ভয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 77,
+    "question": "'ওগো, তোরা জয়ধ্বনি করো।' এই বাক্যে 'তোরা' শব্দটি কী প্রকাশ করছে?",
+    "options": [
+      "নির্দেশ",
+      "আহ্বান",
+      "অনুরোধ",
+      "উপদেশ"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 78,
+    "question": "'দুর! এ কথা কি বলতে আছে?'এই বাক্যে 'দুর' দ্বারা কী বোঝানো হয়েছে?",
+    "options": [
+      "ঘৃণা",
+      "রাগ",
+      "সন্দেহ",
+      "অনীহা"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 79,
+    "question": "আবেগ শব্দগুলো সাধারণত বাক্যে কোথায় ব্যবহৃত হয়?",
+    "options": [
+      "প্রথমে",
+      "শেষে",
+      "মাঝে",
+      "যেকোনো স্থানে"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 80,
+    "question": "আবেগ শব্দ কোন ধরনের অর্থ প্রকাশ করে?",
+    "options": [
+      "আভিধানিক অর্থ",
+      "ভাব বা অনুভূতি",
+      "রূপক অর্থ",
+      "সরল অর্থ"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 81,
+    "question": "'বাহ' শব্দটি কোন আবেগের বহিঃপ্রকাশ?",
+    "options": [
+      "ঘৃণা",
+      "প্রশংসা",
+      "ভয়",
+      "দুঃখ"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 82,
+    "question": "'ছি ছি' কোন ধরনের আবেগের বহিঃপ্রকাশ?",
+    "options": [
+      "প্রশংসা",
+      "বিরক্তি",
+      "ভয়",
+      "আনন্দ"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 83,
+    "question": "'আহা' কোন ধরনের আবেগের বহিঃপ্রকাশ?",
+    "options": [
+      "আনন্দ",
+      "হতাশা",
+      "মায়া",
+      "বিরক্তি"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 84,
+    "question": "'জ্বালা'শব্দটি কী হিসেবে ব্যবহৃত হয়েছে?",
+    "options": [
+      "ক্রিয়াপদ",
+      "বিশেষ্য",
+      "আবেগ শব্দ",
+      "বিশেষণ"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 85,
+    "question": "'হে' শব্দটি কী হিসেবে ব্যবহৃত হয়েছে?",
+    "options": [
+      "বিশেষণ",
+      "আবেগ শব্দ",
+      "অব্যয়",
+      "উপসর্গ"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 86,
+    "question": "'যাকগে' শব্দটির মাধ্যমে কোন ধরনের মনোভাব প্রকাশ পায়?",
+    "options": [
+      "অনুরোধ",
+      "মিনতি",
+      "উভয়ই",
+      "কোনোটিই নয়"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 87,
+    "question": "'দুর' শব্দটি কী হিসেবে ব্যবহৃত হয়েছে?",
+    "options": [
+      "ঘৃণা",
+      "বিরক্তি",
+      "সংশয়",
+      "সবগুলি"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 88,
+    "question": "'বাপরে বাপ'এই পদটি কী হিসেবে ব্যবহৃত হয়েছে?",
+    "options": [
+      "আবেগ",
+      "যোজক",
+      "অনুসর্গ",
+      "অব্যয়"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 89,
+    "question": "'হ্যাঁ' এবং 'না' কোন ধরনের আবেগ?",
+    "options": [
+      "সিদ্ধান্ত আবেগ",
+      "বিরক্তি আবেগ",
+      "বিস্ময় আবেগ",
+      "করুণা আবেগ"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 90,
+    "question": "'শাবাশ' এবং 'বাহ' শব্দ দুটি কোন ধরনের আবেগ প্রকাশ করে?",
+    "options": [
+      "ঘৃণা",
+      "করুণা",
+      "প্রশংসা",
+      "বিস্ময়"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 91,
+    "question": "'ছি ছি' এবং 'আহ' এই দুটি শব্দের মধ্যে পার্থক্য কী?",
+    "options": [
+      "একটি প্রশংসা প্রকাশ করে, অন্যটি ঘৃণা।",
+      "একটি ঘৃণা প্রকাশ করে, অন্যটি বিস্ময়।",
+      "একটি বিরক্তি প্রকাশ করে, অন্যটি করুণা।",
+      "একটি ঘৃণা প্রকাশ করে, অন্যটি আনন্দ।"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 92,
+    "question": "'আহা' এবং 'হায় হায়'শব্দ দুটি কোন ধরনের আবেগ প্রকাশ করে?",
+    "options": [
+      "বিরক্তি",
+      "ভয়",
+      "মায়া",
+      "করুণা"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 93,
+    "question": "'হে বন্ধু'এবং 'ওগো' শব্দ দুটি কীসের জন্য ব্যবহৃত হয়?",
+    "options": [
+      "কাউকে ডাকার জন্য",
+      "কাউকে সম্মান জানানোর জন্য",
+      "কাউকে ভয় দেখানোর জন্য",
+      "কোনোটিই নয়"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 94,
+    "question": "আবেগ শব্দগুলো কীসের মতো কাজ করে?",
+    "options": [
+      "বাক্যের প্রধান অংশ হিসেবে",
+      "বাক্যের অলংকার হিসেবে",
+      "বাক্যের সহায়ক হিসেবে",
+      "বাক্যের গঠন পরিবর্তনকারী হিসেবে"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 95,
+    "question": "'উহ' এবং 'হায় হায়'এই দুটি শব্দের মধ্যে পার্থক্য কী?",
+    "options": [
+      "একটি আতঙ্ক প্রকাশ করে, অন্যটি করুণা।",
+      "একটি করুণা প্রকাশ করে, অন্যটি আতঙ্ক।",
+      "একটি প্রশংসা প্রকাশ করে, অন্যটি ঘৃণা।",
+      "একটি বিস্ময় প্রকাশ করে, অন্যটি বিরক্তি।"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 96,
+    "question": "'বাহ' এবং 'আহ্' এই দুটি শব্দের মধ্যে পার্থক্য কী?",
+    "options": [
+      "একটি ঘৃণা প্রকাশ করে, অন্যটি করুণা।",
+      "একটি প্রশংসা প্রকাশ করে, অন্যটি বিস্ময়।",
+      "একটি বিরক্তি প্রকাশ করে, অন্যটি আতঙ্ক।",
+      "একটি বিস্ময় প্রকাশ করে, অন্যটি প্রশংসা।"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 97,
+    "question": "'যাকগে' শব্দটি কোন ধরনের মনোভাব প্রকাশ করে?",
+    "options": [
+      "সিদ্ধান্তহীনতা",
+      "অনিচ্ছা",
+      "আগ্রহ",
+      "বিস্ময়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 98,
+    "question": "'বাপরে বাপ'শব্দটির মাধ্যমে কী প্রকাশ পায়?",
+    "options": [
+      "ভয়",
+      "ঘৃণা",
+      "প্রশংসা",
+      "আনন্দ"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 99,
+    "question": "আবেগ শব্দগুলো বাক্যে কোথায় ব্যবহৃত হয়?",
+    "options": [
+      "সর্বদা বাক্যের শুরুতে",
+      "সর্বদা বাক্যের শেষে",
+      "বাক্যের যেকোনো স্থানে, তবে শুরুতে বেশি",
+      "বাক্যের মাঝখানে"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 100,
+    "question": "আবেগ শব্দের প্রয়োগে সাধারণত কোনটি ব্যবহৃত হয় না?",
+    "options": [
+      "বিস্ময়সূচক চিহ্ন",
+      "কমা",
+      "পূর্ণচ্ছেদ",
+      "কোনোটিই নয়"
+    ],
+    "answer": 2
+  }
+];
+
+let currentQuestion = 0;
+let score = 0;
+let wrongAnswers = [];
+let timer;
+let timeLeft = 30;
+let paused = false;
+
+const questionEl = document.getElementById("question");
+const optionsEl = document.getElementById("options");
+const progressBar = document.getElementById("progress-bar");
+const timerBar = document.getElementById("timer-bar");
+const scoreEl = document.getElementById("score");
+const currentQuestionEl = document.getElementById("current-question");
+const totalQuestionsEl = document.getElementById("total-questions");
+const quizContainer = document.getElementById("quiz-container");
+const startScreen = document.getElementById("start-screen");
+const resultScreen = document.getElementById("result-screen");
+const finalScore = document.getElementById("final-score");
+const wrongSummary = document.getElementById("wrong-summary");
+
+totalQuestionsEl.innerText = quizData.length;
+
+function startQuiz() {
+    startScreen.style.display = "none";
+    quizContainer.style.display = "block";
+    currentQuestion = 0;
+    score = 0;
+    wrongAnswers = [];
+    updateScore();
+    showQuestion();
+    openFullscreen();
+}
+
+function showQuestion() {
+    if (currentQuestion >= quizData.length) {
+        endQuiz();
+        return;
+    }
+
+    timeLeft = 30;
+    updateTimer();
+    startTimer();
+
+    const q = quizData[currentQuestion];
+    questionEl.innerText = `${q.id}. ${q.question}`; // Show serial from JSON
+    adjustFontSize(questionEl, q.question, 6);
+
+    optionsEl.innerHTML = "";
+    q.options.forEach((option, index) => {
+        const btn = document.createElement("div");
+        btn.classList.add("option");
+        btn.innerText = option;
+        adjustFontSize(btn, option, 4);
+        btn.addEventListener("click", () => selectAnswer(index));
+        optionsEl.appendChild(btn);
+    });
+
+    currentQuestionEl.innerText = currentQuestion + 1;
+    progressBar.style.width = ((currentQuestion / quizData.length) * 100) + "%";
+}
+
+// Dynamic font adjustment
+function adjustFontSize(el, text, maxSize) {
+    let size = maxSize - Math.floor(text.length / 25);
+    if (size < 3) size = 3;
+    el.style.fontSize = size + "vw";
+}
+
+function selectAnswer(index) {
+    stopTimer();
+    const q = quizData[currentQuestion];
+    const optionEls = document.querySelectorAll(".option");
+
+    if (index === q.answer) {
+        optionEls[index].classList.add("correct");
+        score++;
+    } else {
+        optionEls[index].classList.add("wrong");
+        optionEls[q.answer].classList.add("correct");
+        wrongAnswers.push(q);
+    }
+
+    updateScore();
+    setTimeout(() => {
+        currentQuestion++;
+        showQuestion();
+    }, 1000);
+}
+
+function updateScore() { scoreEl.innerText = `Score: ${score}`; }
+
+function startTimer() {
+    timerBar.style.width = "100%";
+    timer = setInterval(() => {
+        if (!paused) {
+            timeLeft--;
+            timerBar.style.width = (timeLeft / 30 * 100) + "%";
+            if (timeLeft <= 0) {
+                stopTimer();
+                wrongAnswers.push(quizData[currentQuestion]);
+                currentQuestion++;
+                showQuestion();
+            }
+        }
+    }, 1000);
+}
+
+function stopTimer() { clearInterval(timer); }
+function updateTimer() { timerBar.style.width = "100%"; }
+function pauseQuiz() { paused = true; }
+function resumeQuiz() { paused = false; }
+function stopQuiz() { stopTimer(); endQuiz(); }
+
+function endQuiz() {
+    quizContainer.style.display = "none";
+    resultScreen.style.display = "flex";
+    finalScore.innerText = `${score} / ${quizData.length}`;
+    if(wrongAnswers.length > 0){
+        wrongSummary.innerText = `Wrong Answers: ${wrongAnswers.length} / ${quizData.length}`;
+    } else {
+        wrongSummary.innerText = "";
+    }
+}
+
+function restartQuiz() {
+    resultScreen.style.display = "none";
+    startScreen.style.display = "flex";
+}
+
+function retryWrong() {
+    if (wrongAnswers.length === 0) return;
+    quizData.splice(0, quizData.length, ...wrongAnswers);
+    resultScreen.style.display = "none";
+    quizContainer.style.display = "block";
+    currentQuestion = 0;
+    score = 0;
+    wrongAnswers = [];
+    updateScore();
+    showQuestion();
+}
+
+function openFullscreen() {
+    const elem = document.documentElement;
+    if (elem.requestFullscreen) { elem.requestFullscreen(); }
+    else if (elem.webkitRequestFullscreen) { elem.webkitRequestFullscreen(); }
+    else if (elem.msRequestFullscreen) { elem.msRequestFullscreen(); }
+}
+</script>
+
+</body>
+</html>

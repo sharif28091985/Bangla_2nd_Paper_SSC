@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Full-Screen MCQ Quiz</title>
+<style>
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #1a1a1a;
+    font-family: Arial, sans-serif;
+    color: #fff;
+    overflow: hidden;
+}
+
+#quiz-container {
+    display: none;
+    width: 100%;
+    height: 100%;
+    position: relative;
+}
+
+.question {
+    text-align: center;
+    margin: 3% auto;
+    word-wrap: break-word;
+    font-weight: bold;
+}
+
+.options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 3%;
+    width: 85%;
+    height: 60%;
+    margin: 0 auto;
+}
+
+.option {
+    background-color: #333;
+    border: 2px solid #00ffff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold;
+    font-size: 4vw;
+    cursor: pointer;
+    text-align: center;
+    padding: 1%;
+    border-radius: 10px;
+    transition: 0.3s;
+}
+
+.option.correct { background-color: #00cc00; color: #000; }
+.option.wrong { background-color: #cc0000; color: #000; }
+
+.top-bar {
+    width: 100%;
+    height: 60px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 2%;
+    box-sizing: border-box;
+    font-size: 1.8vw;
+}
+
+.progress-container, .timer-container {
+    width: 35%;
+    background: #333;
+    border-radius: 25px;
+    overflow: hidden;
+}
+
+.progress-bar, .timer-bar {
+    height: 25px;
+    width: 0;
+    background-color: #00ffff;
+    transition: width 0.3s;
+}
+
+.score { color: #00ff00; }
+
+.control-buttons {
+    position: absolute;
+    top: 50%;
+    right: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.control-buttons button {
+    background-color: #333;
+    border: 2px solid #00ffff;
+    color: #fff;
+    font-weight: bold;
+    cursor: pointer;
+    border-radius: 10px;
+    transition: 0.3s;
+    padding: 10px 15px;
+    text-align: center;
+}
+
+#start-screen, #result-screen {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+    flex-direction: column;
+}
+
+#start-screen button, #result-screen button {
+    font-size: 3.5vw;
+    padding: 15px 30px;
+    cursor: pointer;
+    border-radius: 15px;
+    border: none;
+    background-color: #00ffff;
+    color: #000;
+    margin-top: 20px;
+}
+</style>
+</head>
+<body>
+
+<div id="start-screen">
+    <h1>Welcome to the Quiz!</h1>
+    <button onclick="startQuiz()">Start Quiz</button>
+</div>
+
+<div id="quiz-container">
+    <div class="top-bar">
+        <div>Q No: <span id="current-question">1</span> / <span id="total-questions"></span></div>
+        <div class="progress-container">
+            <div class="progress-bar" id="progress-bar"></div>
+        </div>
+        <div class="timer-container">
+            <div class="timer-bar" id="timer-bar"></div>
+        </div>
+        <div class="score" id="score">Score: 0</div>
+    </div>
+
+    <div class="question" id="question"></div>
+    <div class="options" id="options"></div>
+
+    <div class="control-buttons">
+        <button id="pause-btn" onclick="pauseQuiz()">Pause</button>
+        <button id="resume-btn" onclick="resumeQuiz()">Resume</button>
+        <button id="stop-btn" onclick="stopQuiz()">Stop</button>
+    </div>
+</div>
+
+<div id="result-screen">
+    <h1>Your Score: <span id="final-score"></span></h1>
+    <h2 id="wrong-summary"></h2>
+    <button onclick="retryWrong()">Retry Wrong Answers</button>
+    <button onclick="restartQuiz()">Restart Quiz</button>
+</div>
+
+<script>
+// JSON formatted questions
+const quizData = [
+  {
+    "id": 1,
+    "question": "যেসব শব্দ দিয়ে ব্যক্তি, প্রাণী, স্থান, বস্তু, ধারণা ও গুণের নাম বোঝায়, সেগুলোকে কী বলে?",
+    "options": [
+      "সর্বনাম",
+      "বিশেষণ",
+      "ক্রিয়া",
+      "বিশেষ্য"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 2,
+    "question": "বিশেষ্য পদ সাধারণত কয় প্রকার?",
+    "options": [
+      "চার",
+      "পাঁচ",
+      "ছয়",
+      "সাত"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 3,
+    "question": "'নজরুল', 'বাঘ', 'ঢাকা', 'ইট'—এগুলো কোন পদের উদাহরণ?",
+    "options": [
+      "সর্বনাম",
+      "বিশেষণ",
+      "বিশেষ্য",
+      "ক্রিয়া"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 4,
+    "question": "ব্যক্তি, স্থান, দেশ, কাল, সৃষ্টিকর্মের সুনির্দিষ্ট নামকে কোন বিশেষ্য বলা হয়?",
+    "options": [
+      "নাম-বিশেষ্য",
+      "জাতি-বিশেষ্য",
+      "বস্তু-বিশেষ্য",
+      "গুণ-বিশেষ্য"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 5,
+    "question": "নিচের কোনটি নাম-বিশেষ্যের উদাহরণ?",
+    "options": [
+      "মানুষ",
+      "পদ্মা",
+      "বই",
+      "জনতা"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 6,
+    "question": "'ঢাকা' কোন শ্রেণির নাম-বিশেষ্য?",
+    "options": [
+      "ব্যক্তিনাম",
+      "স্থাননাম",
+      "কালনাম",
+      "সৃষ্টিনাম"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 7,
+    "question": "'সোমবার' এবং 'বৈশাখ' কোন ধরনের নাম-বিশেষ্য?",
+    "options": [
+      "ব্যক্তিনাম",
+      "স্থাননাম",
+      "কালনাম",
+      "সৃষ্টিনাম"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 8,
+    "question": "'গীতাঞ্জলি' ও 'ইত্তেফাক' কোন শ্রেণির নাম-বিশেষ্য?",
+    "options": [
+      "ব্যক্তিনাম",
+      "স্থাননাম",
+      "কালনাম",
+      "সৃষ্টিনাম"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 9,
+    "question": "কোন বিশেষ্যকে 'সাধারণ-বিশেষ্য' নামেও অভিহিত করা হয়?",
+    "options": [
+      "নাম-বিশেষ্য",
+      "জাতি-বিশেষ্য",
+      "বস্তু-বিশেষ্য",
+      "গুণ-বিশেষ্য"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 10,
+    "question": "'মানুষ', 'গরু', 'ফুল', 'নদী' ইত্যাদি কোন শ্রেণির বিশেষ্য?",
+    "options": [
+      "নাম-বিশেষ্য",
+      "জাতি-বিশেষ্য",
+      "বস্তু-বিশেষ্য",
+      "গুণ-বিশেষ্য"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 11,
+    "question": "'ইট', 'লবণ', 'আকাশ', 'বই' কোন ধরনের বিশেষ্য?",
+    "options": [
+      "সমষ্টি-বিশেষ্য",
+      "গুণ-বিশেষ্য",
+      "ক্রিয়া-বিশেষ্য",
+      "বস্তু-বিশেষ্য"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 12,
+    "question": "যে বিশেষ্য দিয়ে ব্যক্তি বা প্রাণীর সমষ্টি বোঝায়, তাকে কী বলে?",
+    "options": [
+      "সমষ্টি-বিশেষ্য",
+      "বস্তু-বিশেষ্য",
+      "জাতি-বিশেষ্য",
+      "নাম-বিশেষ্য"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 13,
+    "question": "নিচের কোনটি সমষ্টি-বিশেষ্যের উদাহরণ?",
+    "options": [
+      "টেবিল",
+      "পরিবার",
+      "আনন্দ",
+      "ভোজন"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 14,
+    "question": "'সরলতা', 'দয়া', 'আনন্দ'—এগুলো কোন ধরনের বিশেষ্য?",
+    "options": [
+      "সমষ্টি-বিশেষ্য",
+      "গুণ-বিশেষ্য",
+      "ক্রিয়া-বিশেষ্য",
+      "নাম-বিশেষ্য"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 15,
+    "question": "'ভোজন' কোন শ্রেণির বিশেষ্য?",
+    "options": [
+      "সমষ্টি-বিশেষ্য",
+      "গুণ-বিশেষ্য",
+      "ক্রিয়া-বিশেষ্য",
+      "নাম-বিশেষ্য"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 16,
+    "question": "'ঝাঁক' শব্দটি কোন শ্রেণির বিশেষ্য?",
+    "options": [
+      "নাম-বিশেষ্য",
+      "জাতি-বিশেষ্য",
+      "সমষ্টি-বিশেষ্য",
+      "বস্তু-বিশেষ্য"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 17,
+    "question": "'সরলতা' ও 'দীনতা' কোন ধরনের বিশেষ্য?",
+    "options": [
+      "নাম-বিশেষ্য",
+      "জাতি-বিশেষ্য",
+      "গুণ-বিশেষ্য",
+      "ক্রিয়া-বিশেষ্য"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 18,
+    "question": "'ভ্রমণ' শব্দটি কোন শ্রেণির বিশেষ্য?",
+    "options": [
+      "সমষ্টি-বিশেষ্য",
+      "বস্তু-বিশেষ্য",
+      "ক্রিয়া-বিশেষ্য",
+      "গুণ-বিশেষ্য"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 19,
+    "question": "'সঞ্চিতা' কোন ধরনের বিশেষ্যের উদাহরণ?",
+    "options": [
+      "ব্যক্তিনাম",
+      "স্থাননাম",
+      "কালনাম",
+      "সৃষ্টিনাম"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 20,
+    "question": "নিচের কোনটি বস্তু-বিশেষ্যের উদাহরণ?",
+    "options": [
+      "আনন্দ",
+      "মানুষ",
+      "হিমালয়",
+      "বই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 21,
+    "question": "'ইত্তেফাক' কোন ধরনের নাম-বিশেষ্য?",
+    "options": [
+      "ব্যক্তিনাম",
+      "স্থাননাম",
+      "সৃষ্টিনাম",
+      "কালনাম"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 22,
+    "question": "'আকাশ' কোন শ্রেণির বিশেষ্য?",
+    "options": [
+      "নাম-বিশেষ্য",
+      "জাতি-বিশেষ্য",
+      "বস্তু-বিশেষ্য",
+      "গুণ-বিশেষ্য"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 23,
+    "question": "'ঝাঁক' শব্দটি কোন শ্রেণির বিশেষ্য?",
+    "options": [
+      "নাম-বিশেষ্য",
+      "জাতি-বিশেষ্য",
+      "সমষ্টি-বিশেষ্য",
+      "বস্তু-বিশেষ্য"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 24,
+    "question": "কোনটি 'নদী' শব্দের নাম-বিশেষ্যের উদাহরণ?",
+    "options": [
+      "নদী",
+      "পদ্মা",
+      "যমুনা",
+      "মেঘনা"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 25,
+    "question": "কোনটি 'মানুষ' শব্দের জাতি-বিশেষ্যের উদাহরণ?",
+    "options": [
+      "জনতা",
+      "পদ্মা",
+      "ঢাকা",
+      "মানুষ"
+    ],
+    "answer": 3
+  }
+];
+
+let currentQuestion = 0;
+let score = 0;
+let wrongAnswers = [];
+let timer;
+let timeLeft = 30;
+let paused = false;
+
+const questionEl = document.getElementById("question");
+const optionsEl = document.getElementById("options");
+const progressBar = document.getElementById("progress-bar");
+const timerBar = document.getElementById("timer-bar");
+const scoreEl = document.getElementById("score");
+const currentQuestionEl = document.getElementById("current-question");
+const totalQuestionsEl = document.getElementById("total-questions");
+const quizContainer = document.getElementById("quiz-container");
+const startScreen = document.getElementById("start-screen");
+const resultScreen = document.getElementById("result-screen");
+const finalScore = document.getElementById("final-score");
+const wrongSummary = document.getElementById("wrong-summary");
+
+totalQuestionsEl.innerText = quizData.length;
+
+function startQuiz() {
+    startScreen.style.display = "none";
+    quizContainer.style.display = "block";
+    currentQuestion = 0;
+    score = 0;
+    wrongAnswers = [];
+    updateScore();
+    showQuestion();
+    openFullscreen();
+}
+
+function showQuestion() {
+    if (currentQuestion >= quizData.length) {
+        endQuiz();
+        return;
+    }
+
+    timeLeft = 30;
+    updateTimer();
+    startTimer();
+
+    const q = quizData[currentQuestion];
+    questionEl.innerText = `${q.id}. ${q.question}`; // Show serial from JSON
+    adjustFontSize(questionEl, q.question, 6);
+
+    optionsEl.innerHTML = "";
+    q.options.forEach((option, index) => {
+        const btn = document.createElement("div");
+        btn.classList.add("option");
+        btn.innerText = option;
+        adjustFontSize(btn, option, 4);
+        btn.addEventListener("click", () => selectAnswer(index));
+        optionsEl.appendChild(btn);
+    });
+
+    currentQuestionEl.innerText = currentQuestion + 1;
+    progressBar.style.width = ((currentQuestion / quizData.length) * 100) + "%";
+}
+
+// Dynamic font adjustment
+function adjustFontSize(el, text, maxSize) {
+    let size = maxSize - Math.floor(text.length / 25);
+    if (size < 3) size = 3;
+    el.style.fontSize = size + "vw";
+}
+
+function selectAnswer(index) {
+    stopTimer();
+    const q = quizData[currentQuestion];
+    const optionEls = document.querySelectorAll(".option");
+
+    if (index === q.answer) {
+        optionEls[index].classList.add("correct");
+        score++;
+    } else {
+        optionEls[index].classList.add("wrong");
+        optionEls[q.answer].classList.add("correct");
+        wrongAnswers.push(q);
+    }
+
+    updateScore();
+    setTimeout(() => {
+        currentQuestion++;
+        showQuestion();
+    }, 1000);
+}
+
+function updateScore() { scoreEl.innerText = `Score: ${score}`; }
+
+function startTimer() {
+    timerBar.style.width = "100%";
+    timer = setInterval(() => {
+        if (!paused) {
+            timeLeft--;
+            timerBar.style.width = (timeLeft / 30 * 100) + "%";
+            if (timeLeft <= 0) {
+                stopTimer();
+                wrongAnswers.push(quizData[currentQuestion]);
+                currentQuestion++;
+                showQuestion();
+            }
+        }
+    }, 1000);
+}
+
+function stopTimer() { clearInterval(timer); }
+function updateTimer() { timerBar.style.width = "100%"; }
+function pauseQuiz() { paused = true; }
+function resumeQuiz() { paused = false; }
+function stopQuiz() { stopTimer(); endQuiz(); }
+
+function endQuiz() {
+    quizContainer.style.display = "none";
+    resultScreen.style.display = "flex";
+    finalScore.innerText = `${score} / ${quizData.length}`;
+    if(wrongAnswers.length > 0){
+        wrongSummary.innerText = `Wrong Answers: ${wrongAnswers.length} / ${quizData.length}`;
+    } else {
+        wrongSummary.innerText = "";
+    }
+}
+
+function restartQuiz() {
+    resultScreen.style.display = "none";
+    startScreen.style.display = "flex";
+}
+
+function retryWrong() {
+    if (wrongAnswers.length === 0) return;
+    quizData.splice(0, quizData.length, ...wrongAnswers);
+    resultScreen.style.display = "none";
+    quizContainer.style.display = "block";
+    currentQuestion = 0;
+    score = 0;
+    wrongAnswers = [];
+    updateScore();
+    showQuestion();
+}
+
+function openFullscreen() {
+    const elem = document.documentElement;
+    if (elem.requestFullscreen) { elem.requestFullscreen(); }
+    else if (elem.webkitRequestFullscreen) { elem.webkitRequestFullscreen(); }
+    else if (elem.msRequestFullscreen) { elem.msRequestFullscreen(); }
+}
+</script>
+
+</body>
+</html>

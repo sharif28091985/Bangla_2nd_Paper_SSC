@@ -1,0 +1,1421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Full-Screen MCQ Quiz</title>
+<style>
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #1a1a1a;
+    font-family: Arial, sans-serif;
+    color: #fff;
+    overflow: hidden;
+}
+
+#quiz-container {
+    display: none;
+    width: 100%;
+    height: 100%;
+    position: relative;
+}
+
+.question {
+    text-align: center;
+    margin: 3% auto;
+    word-wrap: break-word;
+    font-weight: bold;
+}
+
+.options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 3%;
+    width: 85%;
+    height: 60%;
+    margin: 0 auto;
+}
+
+.option {
+    background-color: #333;
+    border: 2px solid #00ffff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold;
+    font-size: 4vw;
+    cursor: pointer;
+    text-align: center;
+    padding: 1%;
+    border-radius: 10px;
+    transition: 0.3s;
+}
+
+.option.correct { background-color: #00cc00; color: #000; }
+.option.wrong { background-color: #cc0000; color: #000; }
+
+.top-bar {
+    width: 100%;
+    height: 60px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 2%;
+    box-sizing: border-box;
+    font-size: 1.8vw;
+}
+
+.progress-container, .timer-container {
+    width: 35%;
+    background: #333;
+    border-radius: 25px;
+    overflow: hidden;
+}
+
+.progress-bar, .timer-bar {
+    height: 25px;
+    width: 0;
+    background-color: #00ffff;
+    transition: width 0.3s;
+}
+
+.score { color: #00ff00; }
+
+.control-buttons {
+    position: absolute;
+    top: 50%;
+    right: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.control-buttons button {
+    background-color: #333;
+    border: 2px solid #00ffff;
+    color: #fff;
+    font-weight: bold;
+    cursor: pointer;
+    border-radius: 10px;
+    transition: 0.3s;
+    padding: 10px 15px;
+    text-align: center;
+}
+
+#start-screen, #result-screen {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+    flex-direction: column;
+}
+
+#start-screen button, #result-screen button {
+    font-size: 3.5vw;
+    padding: 15px 30px;
+    cursor: pointer;
+    border-radius: 15px;
+    border: none;
+    background-color: #00ffff;
+    color: #000;
+    margin-top: 20px;
+}
+</style>
+</head>
+<body>
+
+<div id="start-screen">
+    <h1>Welcome to the Quiz!</h1>
+    <button onclick="startQuiz()">Start Quiz</button>
+</div>
+
+<div id="quiz-container">
+    <div class="top-bar">
+        <div>Q No: <span id="current-question">1</span> / <span id="total-questions"></span></div>
+        <div class="progress-container">
+            <div class="progress-bar" id="progress-bar"></div>
+        </div>
+        <div class="timer-container">
+            <div class="timer-bar" id="timer-bar"></div>
+        </div>
+        <div class="score" id="score">Score: 0</div>
+    </div>
+
+    <div class="question" id="question"></div>
+    <div class="options" id="options"></div>
+
+    <div class="control-buttons">
+        <button id="pause-btn" onclick="pauseQuiz()">Pause</button>
+        <button id="resume-btn" onclick="resumeQuiz()">Resume</button>
+        <button id="stop-btn" onclick="stopQuiz()">Stop</button>
+    </div>
+</div>
+
+<div id="result-screen">
+    <h1>Your Score: <span id="final-score"></span></h1>
+    <h2 id="wrong-summary"></h2>
+    <button onclick="retryWrong()">Retry Wrong Answers</button>
+    <button onclick="restartQuiz()">Restart Quiz</button>
+</div>
+
+<script>
+// JSON formatted questions
+const quizData = [
+  {
+    "id": 1,
+    "question": "বাক্যকে কয়টি অংশে ভাগ করা যায়?",
+    "options": [
+      "এক",
+      "দুই",
+      "তিন",
+      "চার"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 2,
+    "question": "বাক্যে যাকে উদ্দেশ্য করে কিছু বলা হয়, তাকে কী বলে?",
+    "options": [
+      "বিধেয়",
+      "উদ্দেশ্য",
+      "কর্তা",
+      "পূরক"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 3,
+    "question": "'সুমন বল খেলে।' — এই বাক্যে উদ্দেশ্য কোনটি?",
+    "options": [
+      "সুমন",
+      "বল",
+      "খেলে",
+      "বল খেলে"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 4,
+    "question": "বাক্যে উদ্দেশ্য সম্পর্কে যা বলা হয়, তাকে কী বলে?",
+    "options": [
+      "উদ্দেশ্য",
+      "বিধেয়",
+      "কর্তা",
+      "পূরক"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 5,
+    "question": "'সুমন বল খেলে।' — এই বাক্যে বিধেয় অংশ কোনটি?",
+    "options": [
+      "সুমন",
+      "বল",
+      "খেলে",
+      "বল খেলে"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 6,
+    "question": "বাক্য দীর্ঘতর হলে উদ্দেশ্য ও বিধেয় অংশের সঙ্গে যুক্ত হওয়া শব্দ ও বর্গকে কী বলে?",
+    "options": [
+      "পূরক",
+      "প্রসারক",
+      "ক্রিয়াপদ",
+      "বিশেষ্য"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 7,
+    "question": "বিধেয় ক্রিয়ার বিশেষ্য অংশকে কী বলা হয়?",
+    "options": [
+      "প্রসারক",
+      "পূরক",
+      "উদ্দেশ্য",
+      "বিধেয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 8,
+    "question": "'সেলিম সাহেবের ছেলে সুমন গাছতলায় বসে বই পড়ছে।' — এই বাক্যে উদ্দেশ্য কোনটি?",
+    "options": [
+      "সেলিম সাহেবের ছেলে",
+      "সুমন",
+      "গাছতলায় বসে",
+      "বই"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 9,
+    "question": "'সেলিম সাহেবের ছেলে সুমন গাছতলায় বসে বই পড়ছে।' — এই বাক্যে উদ্দেশ্যের প্রসারক কোনটি?",
+    "options": [
+      "সুমন",
+      "সেলিম সাহেবের ছেলে",
+      "গাছতলায় বসে",
+      "বই পড়ছে"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 10,
+    "question": "'সেলিম সাহেবের ছেলে সুমন গাছতলায় বসে বই পড়ছে।' — এই বাক্যে বিধেয় ক্রিয়ার পূরক কোনটি?",
+    "options": [
+      "সুমন",
+      "গাছতলায় বসে",
+      "বই",
+      "পড়ছে"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 11,
+    "question": "'সেলিম সাহেবের ছেলে সুমন গাছতলায় বসে বই পড়ছে।' — এই বাক্যে বিধেয়ের প্রসারক কোনটি?",
+    "options": [
+      "সেলিম সাহেবের ছেলে",
+      "সুমন",
+      "গাছতলায় বসে",
+      "বই"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 12,
+    "question": "'চিনি বা শর্করা এইসব মিলিয়ে তৈরি হয়।' — এই বাক্যে উদ্দেশ্য কোনটি?",
+    "options": [
+      "চিনি বা শর্করা",
+      "এইসব মিলিয়ে",
+      "তৈরি হয়",
+      "কোনোটিই নয়"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 13,
+    "question": "'এইসব মিলিয়ে তৈরি হয় চিনি বা শর্করা।' — এই বাক্যে উদ্দেশ্য কোনটি?",
+    "options": [
+      "এইসব মিলিয়ে",
+      "তৈরি হয়",
+      "চিনি বা শর্করা",
+      "কোনোটিই নয়"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 14,
+    "question": "সাধারণত কোথায় উদ্দেশ্যের প্রসারক বসে?",
+    "options": [
+      "উদ্দেশ্যের পরে",
+      "উদ্দেশ্যের পূর্বে",
+      "বিধেয়ের পূর্বে",
+      "বাক্যের শেষে"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 15,
+    "question": "সাধারণত কোথায় বিধেয়ের প্রসারক বসে?",
+    "options": [
+      "বিধেয়ের পরে",
+      "বিধেয়ের পূর্বে",
+      "উদ্দেশ্যের পরে",
+      "বাক্যের শেষে"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 16,
+    "question": "বিধেয়ের কোন ধরনের প্রসারক উদ্দেশ্যের পূর্বেও বসতে পারে?",
+    "options": [
+      "স্থান ও কাল সংক্রান্ত",
+      "ব্যক্তি ও বস্তু সংক্রান্ত",
+      "কারণ ও উদ্দেশ্য সংক্রান্ত",
+      "কোনোটিই নয়"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 17,
+    "question": "'১৯৫২ সালে ঢাকার রাজপথে বাঙালি জাতির অহংকার রফিক-সালাম-বরকত-জব্বার মাতৃভাষার জন্য জীবন উৎসর্গ করেছিলেন।' — এই বাক্যে উদ্দেশ্য কোনটি?",
+    "options": [
+      "১৯৫২ সালে",
+      "বাঙালি জাতির অহংকার",
+      "রফিক-সালাম-বরকত-জব্বার",
+      "জীবন"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 18,
+    "question": "'১৯৫২ সালে ঢাকার রাজপথে বাঙালি জাতির অহংকার রফিক-সালাম-বরকত-জব্বার মাতৃভাষার জন্য জীবন উৎসর্গ করেছিলেন।' — এই বাক্যে উদ্দেশ্যের প্রসারক কোনটি?",
+    "options": [
+      "বাঙালি জাতির অহংকার",
+      "১৯৫২ সালে",
+      "ঢাকার রাজপথে",
+      "মাতৃভাষার জন্য"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 19,
+    "question": "'১৯৫২ সালে ঢাকার রাজপথে বাঙালি জাতির অহংকার রফিক-সালাম-বরকত-জব্বার মাতৃভাষার জন্য জীবন উৎসর্গ করেছিলেন।' — এই বাক্যে বিধেয় ক্রিয়া কোনটি?",
+    "options": [
+      "মাতৃভাষার জন্য",
+      "জীবন",
+      "উৎসর্গ করেছিলেন",
+      "রফিক-সালাম-বরকত-জব্বার"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 20,
+    "question": "'১৯৫২ সালে ঢাকার রাজপথে বাঙালি জাতির অহংকার রফিক-সালাম-বরকত-জব্বার মাতৃভাষার জন্য জীবন উৎসর্গ করেছিলেন।' — এই বাক্যে বিধেয়ের পূরক কোনটি?",
+    "options": [
+      "জীবন",
+      "উৎসর্গ করেছিলেন",
+      "মাতৃভাষার জন্য",
+      "রফিক-সালাম-বরকত-জব্বার"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 21,
+    "question": "'১৯৫২ সালে ঢাকার রাজপথে বাঙালি জাতির অহংকার রফিক-সালাম-বরকত-জব্বার মাতৃভাষার জন্য জীবন উৎসর্গ করেছিলেন।' — এই বাক্যে বিধেয়ের প্রসারক কোনটি?",
+    "options": [
+      "বাঙালি জাতির অহংকার",
+      "রফিক-সালাম-বরকত-জব্বার",
+      "জীবন",
+      "১৯৫২ সালে,ঢাকার রাজপথে,মাতৃভাষার জন্য"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 22,
+    "question": "'চিনি বা শর্করা এইসব মিলিয়ে তৈরি হয়।' — এই বাক্যের উদ্দেশ্য ও বিধেয়ের অবস্থান কী ধরনের?",
+    "options": [
+      "উদ্দেশ্য প্রথমে, বিধেয় শেষে",
+      "বিধেয় প্রথমে,উদ্দেশ্য শেষে",
+      "উদ্দেশ্য ও বিধেয় মাঝখানে",
+      "কোনোটিই নয়"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 23,
+    "question": "'এইসব মিলিয়ে তৈরি হয় চিনি বা শর্করা।' — এই বাক্যের উদ্দেশ্য ও বিধেয়ের অবস্থান কী ধরনের?",
+    "options": [
+      "উদ্দেশ্য প্রথমে, বিধেয় শেষে",
+      "বিধেয় প্রথমে,উদ্দেশ্য শেষে",
+      "উদ্দেশ্য ও বিধেয় মাঝখানে",
+      "বিধেয় মাঝে,উদ্দেশ্য শেষে"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 24,
+    "question": "'বল খেলে'অংশটি কেন বিধেয়?",
+    "options": [
+      "এতে একটি ক্রিয়া আছে",
+      "এটি উদ্দেশ্য সম্পর্কে বলা হয়েছে",
+      "এটি একটি পদ",
+      "এটি একটি বর্গ"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 25,
+    "question": "বাক্যে বিধেয় অংশে সাধারণত কী থাকে?",
+    "options": [
+      "পূরক",
+      "প্রসারক",
+      "ক্রিয়া",
+      "উদ্দেশ্য"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 26,
+    "question": "'সুমনের ভাই বল খেলে।' — এখানে 'সুমনের ভাই' হলো কী?",
+    "options": [
+      "উদ্দেশ্য",
+      "উদ্দেশ্য ও প্রসারক",
+      "বিধেয়",
+      "বিধেয় ও পূরক"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 27,
+    "question": "'এইসব মিলিয়ে'অংশটি কী হিসেবে কাজ করেছে?",
+    "options": [
+      "উদ্দেশ্যের প্রসারক",
+      "বিধেয়ের প্রসারক",
+      "পূরক",
+      "ক্রিয়া"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 28,
+    "question": "'তৈরি হয়'অংশটি কী?",
+    "options": [
+      "উদ্দেশ্যের প্রসারক",
+      "বিধেয়ের ক্রিয়া",
+      "পূরক",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 29,
+    "question": "'চিনি বা শর্করা'অংশটি কী?",
+    "options": [
+      "বিধেয়",
+      "পূরক",
+      "উদ্দেশ্য",
+      "কোনোটিই নয়"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 30,
+    "question": "'১৯৫২ সালে'কোন ধরনের প্রসারক?",
+    "options": [
+      "স্থান সংক্রান্ত",
+      "কাল সংক্রান্ত",
+      "কারণ সংক্রান্ত",
+      "উদ্দেশ্য সংক্রান্ত"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 31,
+    "question": "'ঢাকার রাজপথে'কোন ধরনের প্রসারক?",
+    "options": [
+      "স্থান সংক্রান্ত",
+      "কাল সংক্রান্ত",
+      "কারণ সংক্রান্ত",
+      "উদ্দেশ্য সংক্রান্ত"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 32,
+    "question": "'মাতৃভাষার জন্য'কোন ধরনের প্রসারক?",
+    "options": [
+      "স্থান সংক্রান্ত",
+      "কাল সংক্রান্ত",
+      "কারণ সংক্রান্ত",
+      "উদ্দেশ্য সংক্রান্ত"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 33,
+    "question": "'জীবন' শব্দটি কী?",
+    "options": [
+      "বিধেয়ের ক্রিয়া",
+      "বিধেয়ের পূরক",
+      "উদ্দেশ্যের প্রসারক",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 34,
+    "question": "'উৎসর্গ করেছিলেন' কী?",
+    "options": [
+      "উদ্দেশ্যের ক্রিয়া",
+      "বিধেয়ের ক্রিয়া",
+      "পূরক",
+      "প্রসারক"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 35,
+    "question": "'বাঙালি জাতির অহংকার' কী?",
+    "options": [
+      "বিধেয়ের প্রসারক",
+      "উদ্দেশ্যের প্রসারক",
+      "পূরক",
+      "ক্রিয়া"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 36,
+    "question": "'রফিক-সালাম-বরকত-জব্বার'কী?",
+    "options": [
+      "বিধেয়",
+      "উদ্দেশ্য",
+      "পূরক",
+      "প্রসারক"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 37,
+    "question": "'উদ্দেশ্য'এবং 'বিধেয়'এর অবস্থান বাক্যে কী হতে পারে?",
+    "options": [
+      "অপরিবর্তনীয়",
+      "পরিবর্তিত হতে পারে",
+      "সবসময় অপরিবর্তনীয়",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 38,
+    "question": "'পূরক' কী হিসেবে কাজ করে?",
+    "options": [
+      "ক্রিয়ার বিশেষণ হিসেবে",
+      "ক্রিয়ার বিশেষ্য অংশ হিসেবে",
+      "ক্রিয়ার প্রসারক হিসেবে",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 39,
+    "question": "'প্রসারক'কী হিসেবে কাজ করে?",
+    "options": [
+      "উদ্দেশ্য ও বিধেয়কে ছোট করে",
+      "উদ্দেশ্য ও বিধেয়কে দীর্ঘ করে",
+      "উদ্দেশ্য ও বিধেয়কে বাতিল করে",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 40,
+    "question": "'বক্তা'র মনের ভাব পুরোপুরি প্রকাশিত হয় কী দিয়ে?",
+    "options": [
+      "শব্দ",
+      "পদ",
+      "বাক্য",
+      "বর্গ"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 41,
+    "question": "'উদ্দেশ্য'কে ইংরেজিতে কী বলা যায়?",
+    "options": [
+      "Subject",
+      "Predicate",
+      "Object",
+      "Verb"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 42,
+    "question": "'বিধেয়'কে ইংরেজিতে কী বলা যায়?",
+    "options": [
+      "Subject",
+      "Predicate",
+      "Object",
+      "Verb"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 43,
+    "question": "'প্রসারক'কে ইংরেজিতে কী বলা যায়?",
+    "options": [
+      "Expander",
+      "Subject",
+      "Predicate",
+      "Complement"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 44,
+    "question": "'পূরক' কে ইংরেজিতে কী বলা যায়?",
+    "options": [
+      "Expander",
+      "Subject",
+      "Complement",
+      "Verb"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 45,
+    "question": "'সুমন' এবং 'বল' এই দুটি পদের মধ্যে কী পার্থক্য?",
+    "options": [
+      "'সুমন' কর্তা, 'বল' কর্ম",
+      "'সুমন' কর্ম, 'বল' কর্তা",
+      "দুটিই কর্তা",
+      "দুটিই কর্ম"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 46,
+    "question": "'খেলে' অংশটি কী?",
+    "options": [
+      "কর্তা",
+      "কর্ম",
+      "ক্রিয়া",
+      "উদ্দেশ্য"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 47,
+    "question": "'সেলিম সাহেবের ছেলে সুমন' এই পুরো অংশটি কী?",
+    "options": [
+      "উদ্দেশ্য",
+      "উদ্দেশ্য ও প্রসারক",
+      "বিধেয়",
+      "বিধেয় ও পূরক"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 48,
+    "question": "'গাছতলায় বসে বই পড়ছে' এই পুরো অংশটি কী?",
+    "options": [
+      "উদ্দেশ্য ও প্রসারক",
+      "বিধেয় ও প্রসারক",
+      "বিধেয় ও পূরক",
+      "বিধেয়,প্রসারক ও পূরক"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 49,
+    "question": "'১৯৫২ সালে'এবং 'ঢাকার রাজপথে'এই দুটি অংশ কেন উদ্দেশ্যের পূর্বে বসেছে?",
+    "options": [
+      "এগুলো কাল ও স্থান সংক্রান্ত প্রসারক।",
+      "এগুলো উদ্দেশ্যের প্রসারক।",
+      "এগুলো বিধেয়ের প্রসারক।",
+      "ক এবং গ উভয়ই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 50,
+    "question": "বাক্যে উদ্দেশ্যের অবস্থান সাধারণত কোথায়?",
+    "options": [
+      "বাক্যের শেষে",
+      "বাক্যের শুরুতে",
+      "বাক্যের মাঝখানে",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 51,
+    "question": "বাক্যে বিধেয়ের অবস্থান সাধারণত কোথায়?",
+    "options": [
+      "বাক্যের শেষে",
+      "বাক্যের শুরুতে",
+      "বাক্যের মাঝখানে",
+      "কোনোটিই নয়"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 52,
+    "question": "'চিনি বা শর্করা এইসব মিলিয়ে তৈরি হয়।' — এই বাক্যের উদ্দেশ্য ও বিধেয়ের স্বাভাবিক অবস্থান কী?",
+    "options": [
+      "স্বাভাবিক",
+      "অস্বাভাবিক",
+      "উভয়ই",
+      "কোনোটিই নয়"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 53,
+    "question": "'এইসব মিলিয়ে তৈরি হয় চিনি বা শর্করা।' — এই বাক্যের উদ্দেশ্য ও বিধেয়ের অবস্থান কী?",
+    "options": [
+      "স্বাভাবিক",
+      "অস্বাভাবিক",
+      "উভয়ই",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 54,
+    "question": "'উদ্দেশ্য'এবং 'বিধেয়'এর মূল সম্পর্ক কী?",
+    "options": [
+      "কারণ ও ফলাফল",
+      "কর্তা ও ক্রিয়া",
+      "বর্ণনা ও বর্ণনীয় বিষয়",
+      "কোনোটিই নয়"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 55,
+    "question": "'পূরক' এবং 'প্রসারক'এর মধ্যে প্রধান পার্থক্য কী?",
+    "options": [
+      "পূরক ক্রিয়ার বিশেষণ অংশ, প্রসারক ক্রিয়ার বিশেষণ অংশ।",
+      "পূরক ক্রিয়ার বিশেষ্য অংশ, প্রসারক উদ্দেশ্য ও বিধেয়কে দীর্ঘ করে।",
+      "পূরক উদ্দেশ্যকে দীর্ঘ করে, প্রসারক বিধেয়কে দীর্ঘ করে।",
+      "কোনোটিই নয়।"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 56,
+    "question": "'সেলিম সাহেবের ছেলে সুমন' — এখানে 'সুমন' কে?",
+    "options": [
+      "মূল উদ্দেশ্য",
+      "প্রসারক",
+      "বিধেয়",
+      "পূরক"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 57,
+    "question": "'গাছতলায় বসে' — এটি কী?",
+    "options": [
+      "বিধেয়ের প্রসারক",
+      "বিধেয়ের পূরক",
+      "উদ্দেশ্যের প্রসারক",
+      "উদ্দেশ্যের পূরক"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 58,
+    "question": "'বই' — এটি কী?",
+    "options": [
+      "বিধেয়ের প্রসারক",
+      "বিধেয়ের পূরক",
+      "উদ্দেশ্যের প্রসারক",
+      "উদ্দেশ্যের পূরক"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 59,
+    "question": "'১৯৫২ সালে'এবং 'ঢাকার রাজপথে'কোন ধরনের প্রসারক?",
+    "options": [
+      "কালবাচক",
+      "স্থানবাচক",
+      "উদ্দেশ্যবাচক",
+      "ক এবং খ উভয়ই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 60,
+    "question": "'মাতৃভাষার জন্য'কোন ধরনের প্রসারক?",
+    "options": [
+      "কালবাচক",
+      "স্থানবাচক",
+      "উদ্দেশ্যবাচক",
+      "কারণবাচক"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 61,
+    "question": "'উদ্দেশ্য'কাকে বলা হয়?",
+    "options": [
+      "বাক্যের বিধেয়কে",
+      "বাক্যের ক্রিয়াকে",
+      "বাক্যে যাকে উদ্দেশ্য করে কিছু বলা হয়",
+      "বাক্যের কর্মকে"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 62,
+    "question": "'বিধেয়'কাকে বলা হয়?",
+    "options": [
+      "বাক্যে উদ্দেশ্য সম্পর্কে যা বলা হয়",
+      "বাক্যের কর্তা",
+      "বাক্যের কর্ম",
+      "বাক্যের ক্রিয়া"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 63,
+    "question": "'উদ্দেশ্য'এবং 'বিধেয়'এই দুই অংশের বিভাজন কোন ব্যাকরণ অংশের আলোচ্য বিষয়?",
+    "options": [
+      "রূপতত্ত্ব",
+      "ধ্বনিতত্ত্ব",
+      "বাক্যতত্ত্ব",
+      "অর্থতত্ত্ব"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 64,
+    "question": "'পূরক' কোন পদের অংশ?",
+    "options": [
+      "উদ্দেশ্য",
+      "কর্তা",
+      "বিধেয়",
+      "কোনোটিই নয়"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 65,
+    "question": "'প্রসারক'কোন পদের অংশ?",
+    "options": [
+      "উদ্দেশ্য",
+      "বিধেয়",
+      "ক ও খ উভয়ই",
+      "কোনোটিই নয়"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 66,
+    "question": "'১৯৫২ সালে' — এটি কেন বিধেয়ের প্রসারক?",
+    "options": [
+      "এটি উদ্দেশ্য সম্পর্কে বলা হয়েছে।",
+      "এটি বিধেয়ের ক্রিয়াকে প্রসারিত করেছে।",
+      "এটি উদ্দেশ্যকে প্রসারিত করেছে।",
+      "এটি একটি বিশেষ্য।"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 67,
+    "question": "'বাঙালি জাতির অহংকার' — এটি কেন উদ্দেশ্যের প্রসারক?",
+    "options": [
+      "এটি বিধেয় সম্পর্কে বলা হয়েছে।",
+      "এটি উদ্দেশ্যকে প্রসারিত করেছে।",
+      "এটি একটি ক্রিয়া।",
+      "কোনোটিই নয়।"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 68,
+    "question": "'জীবন' শব্দটি কেন 'পূরক'?",
+    "options": [
+      "এটি ক্রিয়ার বিশেষ্য অংশ।",
+      "এটি একটি বিশেষ্য।",
+      "এটি বিধেয়কে প্রসারিত করেছে।",
+      "এটি একটি ক্রিয়া।"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 69,
+    "question": "'সুমন বল খেলে।' — এই বাক্যে 'সুমন' কী?",
+    "options": [
+      "কর্তা ও উদ্দেশ্য",
+      "কর্তা ও বিধেয়",
+      "কর্ম ও উদ্দেশ্য",
+      "কর্ম ও বিধেয়"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 70,
+    "question": "'বল' কী?",
+    "options": [
+      "কর্ম ও উদ্দেশ্য",
+      "কর্ম ও বিধেয়",
+      "কর্ম",
+      "উদ্দেশ্য"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 71,
+    "question": "'খুব সকালে'কী?",
+    "options": [
+      "উদ্দেশ্যের প্রসারক",
+      "বিধেয়ের প্রসারক",
+      "পূরক",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 72,
+    "question": "'গাছতলায় বসে'কী?",
+    "options": [
+      "উদ্দেশ্যের প্রসারক",
+      "বিধেয়ের প্রসারক",
+      "পূরক",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 73,
+    "question": "'বই' কী?",
+    "options": [
+      "উদ্দেশ্যের প্রসারক",
+      "বিধেয়ের পূরক",
+      "বিধেয়ের প্রসারক",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 74,
+    "question": "'উদ্দেশ্য'ও 'বিধেয়'এর মধ্যে কী সম্পর্ক?",
+    "options": [
+      "বিধেয় উদ্দেশ্য সম্পর্কে তথ্য দেয়।",
+      "উদ্দেশ্য বিধেয় সম্পর্কে তথ্য দেয়।",
+      "উভয়ই পরস্পর থেকে স্বাধীন।",
+      "কোনোটিই নয়।"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 75,
+    "question": "কোন বাক্যে উদ্দেশ্যের পূর্বে বিধেয়ের প্রসারক বসতে পারে?",
+    "options": [
+      "জটিল বাক্য",
+      "যৌগিক বাক্য",
+      "সরল বাক্য",
+      "সব ধরনের বাক্যে"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 76,
+    "question": "'চিনি বা শর্করা' — এই অংশটি কোন ধরনের বর্গ?",
+    "options": [
+      "বিশেষ্যবর্গ",
+      "বিশেষণবর্গ",
+      "ক্রিয়াবর্গ",
+      "ক্রিয়াবিশেষণ-বর্গ"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 77,
+    "question": "'এইসব মিলিয়ে' — এই অংশটি কোন ধরনের বর্গ?",
+    "options": [
+      "বিশেষ্যবর্গ",
+      "বিশেষণবর্গ",
+      "ক্রিয়াবর্গ",
+      "ক্রিয়াবিশেষণ-বর্গ"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 78,
+    "question": "'তৈরি হয়' — এই অংশটি কোন ধরনের বর্গ?",
+    "options": [
+      "বিশেষ্যবর্গ",
+      "বিশেষণবর্গ",
+      "ক্রিয়াবর্গ",
+      "ক্রিয়াবিশেষণ-বর্গ"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 79,
+    "question": "'রফিক-সালাম-বরকত-জব্বার' — এই অংশটি কোন ধরনের বর্গ?",
+    "options": [
+      "বিশেষ্যবর্গ",
+      "বিশেষণবর্গ",
+      "ক্রিয়াবর্গ",
+      "ক্রিয়াবিশেষণ-বর্গ"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 80,
+    "question": "'বাঙালি জাতির অহংকার' — এই অংশটি কোন ধরনের বর্গ?",
+    "options": [
+      "বিশেষ্যবর্গ",
+      "বিশেষণবর্গ",
+      "ক্রিয়াবর্গ",
+      "ক্রিয়াবিশেষণ-বর্গ"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 81,
+    "question": "'জীবন' এই পদটি কোন বর্গ তৈরি করে?",
+    "options": [
+      "বিশেষ্যবর্গ",
+      "বিশেষণবর্গ",
+      "ক্রিয়াবর্গ",
+      "কোনোটিই নয়"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 82,
+    "question": "'জীবন উৎসর্গ করেছিলেন' — এই অংশটি কী?",
+    "options": [
+      "উদ্দেশ্য",
+      "বিধেয়",
+      "পূরক",
+      "প্রসারক"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 83,
+    "question": "'১৯৫২ সালে' — এটি কোন ধরনের প্রসারক?",
+    "options": [
+      "বিধেয়র কালবাচক প্রসারক",
+      "উদ্দেশ্যের কালবাচক প্রসারক",
+      "বিধেয়র স্থানবাচক প্রসারক",
+      "উদ্দেশ্যের স্থানবাচক প্রসারক"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 84,
+    "question": "'ঢাকার রাজপথে' — এটি কোন ধরনের প্রসারক?",
+    "options": [
+      "বিধেয়র কালবাচক প্রসারক",
+      "উদ্দেশ্যের কালবাচক প্রসারক",
+      "বিধেয়র স্থানবাচক প্রসারক",
+      "উদ্দেশ্যের স্থানবাচক প্রসারক"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 85,
+    "question": "'মাতৃভাষার জন্য' — এটি কোন ধরনের প্রসারক?",
+    "options": [
+      "বিধেয়র কারণবাচক প্রসারক",
+      "উদ্দেশ্যের কারণবাচক প্রসারক",
+      "বিধেয়র উদ্দেশ্যবাচক প্রসারক",
+      "উদ্দেশ্যের উদ্দেশ্যবাচক প্রসারক"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 86,
+    "question": "'সুমন বল খেলে' — এই বাক্যের কর্তা ও কর্ম কী?",
+    "options": [
+      "সুমন-খেল",
+      "সুমন-বল",
+      "খেলে-বল",
+      "সুমন-খেলে"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 87,
+    "question": "'উদ্দেশ্য'এবং 'বিধেয়'এর বিভাজন কিসের উপর ভিত্তি করে করা হয়?",
+    "options": [
+      "বাক্যের গঠন",
+      "বক্তার মনের ভাব",
+      "শব্দের প্রকৃতি",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 88,
+    "question": "'উদ্দেশ্য'এর অপর নাম কী?",
+    "options": [
+      "বিধেয়",
+      "কর্তা",
+      "পূরক",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 89,
+    "question": "'বিধেয়'এর অপর নাম কী?",
+    "options": [
+      "ক্রিয়া",
+      "কর্ম",
+      "উদ্দেশ্য",
+      "কোনোটিই নয়"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 90,
+    "question": "'উদ্দেশ্য'অংশে কী থাকতে পারে?",
+    "options": [
+      "কর্তা",
+      "প্রসারক",
+      "ক ও খ উভয়ই",
+      "কোনোটিই নয়"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 91,
+    "question": "'বিধেয়'অংশে কী থাকতে পারে?",
+    "options": [
+      "ক্রিয়া",
+      "পূরক",
+      "প্রসারক",
+      "সবগুলি"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 92,
+    "question": "'উদ্দেশ্য'কে ইংরেজিতে বলা হয়:",
+    "options": [
+      "Predicate",
+      "Subject",
+      "Object",
+      "Complement"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 93,
+    "question": "'বিধেয়'কে ইংরেজিতে বলা হয়:",
+    "options": [
+      "Predicate",
+      "Subject",
+      "Object",
+      "Complement"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 94,
+    "question": "'পূরক' কে ইংরেজিতে বলা হয়:",
+    "options": [
+      "Predicate",
+      "Subject",
+      "Object",
+      "Complement"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 95,
+    "question": "'উদ্দেশ্য'ও 'বিধেয়'এর মাঝে কোন ধরনের সম্পর্ক বিদ্যমান?",
+    "options": [
+      "বিপরীত সম্পর্ক",
+      "পরিপূরক সম্পর্ক",
+      "অধীন সম্পর্ক",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 96,
+    "question": "'উদ্দেশ্য'এর সঙ্গে কোন ধরনের শব্দ বা বর্গ যুক্ত হতে পারে?",
+    "options": [
+      "প্রসারক",
+      "পূরক",
+      "উভয়ই",
+      "কোনোটিই নয়"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 97,
+    "question": "'বিধেয়'এর সঙ্গে কোন ধরনের শব্দ বা বর্গ যুক্ত হতে পারে?",
+    "options": [
+      "পূরক",
+      "প্রসারক",
+      "ক্রিয়া",
+      "সবগুলি"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 98,
+    "question": "'উদ্দেশ্য'এর উদাহরণ কোনটি?",
+    "options": [
+      "সুমন বল",
+      "সুমন",
+      "বল খেলে",
+      "খেলে"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 99,
+    "question": "'বিধেয়'এর উদাহরণ কোনটি?",
+    "options": [
+      "সুমন",
+      "বল",
+      "খেলে",
+      "বল খেলে"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 100,
+    "question": "'পূরক' এর উদাহরণ কোনটি?",
+    "options": [
+      "সুমন",
+      "বল",
+      "খেলে",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  }
+];
+
+let currentQuestion = 0;
+let score = 0;
+let wrongAnswers = [];
+let timer;
+let timeLeft = 30;
+let paused = false;
+
+const questionEl = document.getElementById("question");
+const optionsEl = document.getElementById("options");
+const progressBar = document.getElementById("progress-bar");
+const timerBar = document.getElementById("timer-bar");
+const scoreEl = document.getElementById("score");
+const currentQuestionEl = document.getElementById("current-question");
+const totalQuestionsEl = document.getElementById("total-questions");
+const quizContainer = document.getElementById("quiz-container");
+const startScreen = document.getElementById("start-screen");
+const resultScreen = document.getElementById("result-screen");
+const finalScore = document.getElementById("final-score");
+const wrongSummary = document.getElementById("wrong-summary");
+
+totalQuestionsEl.innerText = quizData.length;
+
+function startQuiz() {
+    startScreen.style.display = "none";
+    quizContainer.style.display = "block";
+    currentQuestion = 0;
+    score = 0;
+    wrongAnswers = [];
+    updateScore();
+    showQuestion();
+    openFullscreen();
+}
+
+function showQuestion() {
+    if (currentQuestion >= quizData.length) {
+        endQuiz();
+        return;
+    }
+
+    timeLeft = 30;
+    updateTimer();
+    startTimer();
+
+    const q = quizData[currentQuestion];
+    questionEl.innerText = `${q.id}. ${q.question}`; // Show serial from JSON
+    adjustFontSize(questionEl, q.question, 6);
+
+    optionsEl.innerHTML = "";
+    q.options.forEach((option, index) => {
+        const btn = document.createElement("div");
+        btn.classList.add("option");
+        btn.innerText = option;
+        adjustFontSize(btn, option, 4);
+        btn.addEventListener("click", () => selectAnswer(index));
+        optionsEl.appendChild(btn);
+    });
+
+    currentQuestionEl.innerText = currentQuestion + 1;
+    progressBar.style.width = ((currentQuestion / quizData.length) * 100) + "%";
+}
+
+// Dynamic font adjustment
+function adjustFontSize(el, text, maxSize) {
+    let size = maxSize - Math.floor(text.length / 25);
+    if (size < 3) size = 3;
+    el.style.fontSize = size + "vw";
+}
+
+function selectAnswer(index) {
+    stopTimer();
+    const q = quizData[currentQuestion];
+    const optionEls = document.querySelectorAll(".option");
+
+    if (index === q.answer) {
+        optionEls[index].classList.add("correct");
+        score++;
+    } else {
+        optionEls[index].classList.add("wrong");
+        optionEls[q.answer].classList.add("correct");
+        wrongAnswers.push(q);
+    }
+
+    updateScore();
+    setTimeout(() => {
+        currentQuestion++;
+        showQuestion();
+    }, 1000);
+}
+
+function updateScore() { scoreEl.innerText = `Score: ${score}`; }
+
+function startTimer() {
+    timerBar.style.width = "100%";
+    timer = setInterval(() => {
+        if (!paused) {
+            timeLeft--;
+            timerBar.style.width = (timeLeft / 30 * 100) + "%";
+            if (timeLeft <= 0) {
+                stopTimer();
+                wrongAnswers.push(quizData[currentQuestion]);
+                currentQuestion++;
+                showQuestion();
+            }
+        }
+    }, 1000);
+}
+
+function stopTimer() { clearInterval(timer); }
+function updateTimer() { timerBar.style.width = "100%"; }
+function pauseQuiz() { paused = true; }
+function resumeQuiz() { paused = false; }
+function stopQuiz() { stopTimer(); endQuiz(); }
+
+function endQuiz() {
+    quizContainer.style.display = "none";
+    resultScreen.style.display = "flex";
+    finalScore.innerText = `${score} / ${quizData.length}`;
+    if(wrongAnswers.length > 0){
+        wrongSummary.innerText = `Wrong Answers: ${wrongAnswers.length} / ${quizData.length}`;
+    } else {
+        wrongSummary.innerText = "";
+    }
+}
+
+function restartQuiz() {
+    resultScreen.style.display = "none";
+    startScreen.style.display = "flex";
+}
+
+function retryWrong() {
+    if (wrongAnswers.length === 0) return;
+    quizData.splice(0, quizData.length, ...wrongAnswers);
+    resultScreen.style.display = "none";
+    quizContainer.style.display = "block";
+    currentQuestion = 0;
+    score = 0;
+    wrongAnswers = [];
+    updateScore();
+    showQuestion();
+}
+
+function openFullscreen() {
+    const elem = document.documentElement;
+    if (elem.requestFullscreen) { elem.requestFullscreen(); }
+    else if (elem.webkitRequestFullscreen) { elem.webkitRequestFullscreen(); }
+    else if (elem.msRequestFullscreen) { elem.msRequestFullscreen(); }
+}
+</script>
+
+</body>
+</html>

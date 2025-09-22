@@ -1,0 +1,1421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Full-Screen MCQ Quiz</title>
+<style>
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #1a1a1a;
+    font-family: Arial, sans-serif;
+    color: #fff;
+    overflow: hidden;
+}
+
+#quiz-container {
+    display: none;
+    width: 100%;
+    height: 100%;
+    position: relative;
+}
+
+.question {
+    text-align: center;
+    margin: 3% auto;
+    word-wrap: break-word;
+    font-weight: bold;
+}
+
+.options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 3%;
+    width: 85%;
+    height: 60%;
+    margin: 0 auto;
+}
+
+.option {
+    background-color: #333;
+    border: 2px solid #00ffff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold;
+    font-size: 4vw;
+    cursor: pointer;
+    text-align: center;
+    padding: 1%;
+    border-radius: 10px;
+    transition: 0.3s;
+}
+
+.option.correct { background-color: #00cc00; color: #000; }
+.option.wrong { background-color: #cc0000; color: #000; }
+
+.top-bar {
+    width: 100%;
+    height: 60px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 2%;
+    box-sizing: border-box;
+    font-size: 1.8vw;
+}
+
+.progress-container, .timer-container {
+    width: 35%;
+    background: #333;
+    border-radius: 25px;
+    overflow: hidden;
+}
+
+.progress-bar, .timer-bar {
+    height: 25px;
+    width: 0;
+    background-color: #00ffff;
+    transition: width 0.3s;
+}
+
+.score { color: #00ff00; }
+
+.control-buttons {
+    position: absolute;
+    top: 50%;
+    right: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.control-buttons button {
+    background-color: #333;
+    border: 2px solid #00ffff;
+    color: #fff;
+    font-weight: bold;
+    cursor: pointer;
+    border-radius: 10px;
+    transition: 0.3s;
+    padding: 10px 15px;
+    text-align: center;
+}
+
+#start-screen, #result-screen {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+    flex-direction: column;
+}
+
+#start-screen button, #result-screen button {
+    font-size: 3.5vw;
+    padding: 15px 30px;
+    cursor: pointer;
+    border-radius: 15px;
+    border: none;
+    background-color: #00ffff;
+    color: #000;
+    margin-top: 20px;
+}
+</style>
+</head>
+<body>
+
+<div id="start-screen">
+    <h1>Welcome to the Quiz!</h1>
+    <button onclick="startQuiz()">Start Quiz</button>
+</div>
+
+<div id="quiz-container">
+    <div class="top-bar">
+        <div>Q No: <span id="current-question">1</span> / <span id="total-questions"></span></div>
+        <div class="progress-container">
+            <div class="progress-bar" id="progress-bar"></div>
+        </div>
+        <div class="timer-container">
+            <div class="timer-bar" id="timer-bar"></div>
+        </div>
+        <div class="score" id="score">Score: 0</div>
+    </div>
+
+    <div class="question" id="question"></div>
+    <div class="options" id="options"></div>
+
+    <div class="control-buttons">
+        <button id="pause-btn" onclick="pauseQuiz()">Pause</button>
+        <button id="resume-btn" onclick="resumeQuiz()">Resume</button>
+        <button id="stop-btn" onclick="stopQuiz()">Stop</button>
+    </div>
+</div>
+
+<div id="result-screen">
+    <h1>Your Score: <span id="final-score"></span></h1>
+    <h2 id="wrong-summary"></h2>
+    <button onclick="retryWrong()">Retry Wrong Answers</button>
+    <button onclick="restartQuiz()">Restart Quiz</button>
+</div>
+
+<script>
+// JSON formatted questions
+const quizData = [
+  {
+    "id": 1,
+    "question": "পদ,বর্গ বা বাক্যকে যেসব শব্দ যুক্ত করে,সেগুলোকে কী বলে?",
+    "options": [
+      "অনুসর্গ",
+      "যোজক",
+      "অব্যয়",
+      "বিভক্তি"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 2,
+    "question": "'এবং', 'ও', 'আর' — এগুলো কোন ধরনের শব্দ?",
+    "options": [
+      "অব্যয়",
+      "অনুসর্গ",
+      "যোজক",
+      "বিভক্তি"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 3,
+    "question": "বৈশিষ্ট্য অনুযায়ী যোজককে প্রধানত কয় ভাগে ভাগ করা যায়?",
+    "options": [
+      "তিন",
+      "চার",
+      "পাঁচ",
+      "ছয়"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 4,
+    "question": "যেসব যোজক দুটি শব্দ বা বাক্যকে যোগ করে, সেগুলোকে কী বলে?",
+    "options": [
+      "বিকল্প যোজক",
+      "বিরোধ যোজক",
+      "সাধারণ যোজক",
+      "কারণ যোজক"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 5,
+    "question": "'রহিম ও করিম এই কাজটি করেছে।' — এই বাক্যে 'ও' কোন ধরনের যোজক?",
+    "options": [
+      "বিকল্প যোজক",
+      "বিরোধ যোজক",
+      "সাধারণ যোজক",
+      "সাপেক্ষ যোজক"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 6,
+    "question": "'জলদি দোকানে যাও এবং পাউরুটি কিনে আনো।' — এই বাক্যে 'এবং' কোন ধরনের যোজক?",
+    "options": [
+      "সাপেক্ষ যোজক",
+      "সাধারণ যোজক",
+      "কারণ যোজক",
+      "বিকল্প যোজক"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 7,
+    "question": "'লাল বা নীল কলমটা আনো।' — এই বাক্যে 'বা' কোন ধরনের যোজক?",
+    "options": [
+      "সাধারণ যোজক",
+      "বিরোধ যোজক",
+      "কারণ যোজক",
+      "বিকল্প যোজক"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 8,
+    "question": "যেসব যোজক একাধিক শব্দ বা বাক্যের মধ্যে বিকল্প নির্দেশ করে, সেগুলোকে কী বলে?",
+    "options": [
+      "সাধারণ যোজক",
+      "বিকল্প যোজক",
+      "বিরোধ যোজক",
+      "সাপেক্ষ যোজক"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 9,
+    "question": "'চা না-হয় কফি খান।' — এই বাক্যে 'না-হয়' কোন ধরনের যোজক?",
+    "options": [
+      "কারণ যোজক",
+      "সাধারণ যোজক",
+      "বিকল্প যোজক",
+      "সাপেক্ষ যোজক"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 10,
+    "question": "যেসব যোজক বাক্যের দুটি অংশের সংযোগ ঘটায় এবং প্রথম বাক্যের বক্তব্যের সঙ্গে বিরোধ তৈরি করে,সেগুলোকে কী বলে?",
+    "options": [
+      "বিকল্প যোজক",
+      "সাধারণ যোজক",
+      "বিরোধ যোজক",
+      "কারণ যোজক"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 11,
+    "question": "'এত পড়লাম, কিন্তু পরীক্ষায় ভালো করতে পারলাম না।' — এই বাক্যে 'কিন্তু' কোন ধরনের যোজক?",
+    "options": [
+      "বিকল্প যোজক",
+      "বিরোধ যোজক",
+      "কারণ যোজক",
+      "সাধারণ যোজক"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 12,
+    "question": "'তাকে আসতে বললাম, তবু এল না।' — এই বাক্যে 'তবু' কোন ধরনের যোজক?",
+    "options": [
+      "বিকল্প যোজক",
+      "সাধারণ যোজক",
+      "সাপেক্ষ যোজক",
+      "বিরোধ যোজক"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 13,
+    "question": "যেসব যোজক বাক্যের দুটি অংশের মধ্যে সংযোগ ঘটায় যার একটি অন্যটির কারণ, সেগুলোকে কী বলে?",
+    "options": [
+      "কারণ যোজক",
+      "বিরোধ যোজক",
+      "সাধারণ যোজক",
+      "বিকল্প যোজক"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 14,
+    "question": "'জিনিসের দাম বেড়েছে, কারণ চাহিদা বেশি।' — এই বাক্যে 'কারণ' কোন ধরনের যোজক?",
+    "options": [
+      "সাধারণ যোজক",
+      "বিরোধ যোজক",
+      "কারণ যোজক",
+      "বিকল্প যোজক"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 15,
+    "question": "'বসার সময় নেই, তাই যেতে হচ্ছে।' — এই বাক্যে 'তাই' কোন ধরনের যোজক?",
+    "options": [
+      "বিকল্প যোজক",
+      "বিরোধ যোজক",
+      "কারণ যোজক",
+      "সাপেক্ষ যোজক"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 16,
+    "question": "যেসব যোজক একে অন্যের পরিপূরক হয়ে বাক্যে ব্যবহৃত হয়, সেগুলোকে কী বলে?",
+    "options": [
+      "কারণ যোজক",
+      "সাধারণ যোজক",
+      "বিরোধ যোজক",
+      "সাপেক্ষ যোজক"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 17,
+    "question": "'যদি রোদ ওঠে, তবে রওনা দেব।' — এই বাক্যে 'যদি...তবে' কোন ধরনের যোজক?",
+    "options": [
+      "সাধারণ যোজক",
+      "বিকল্প যোজক",
+      "সাপেক্ষ যোজক",
+      "কারণ যোজক"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 18,
+    "question": "'যত পড়ছি, ততই নতুন করে জানছি।' — এই বাক্যে 'যত...ততই' কোন ধরনের যোজক?",
+    "options": [
+      "বিরোধ যোজক",
+      "সাধারণ যোজক",
+      "সাপেক্ষ যোজক",
+      "কারণ যোজক"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 19,
+    "question": "নিচের কোনটি একটি সাধারণ যোজকের উদাহরণ?",
+    "options": [
+      "কারণ",
+      "কিন্তু",
+      "এবং",
+      "যদি...তবে"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 20,
+    "question": "নিচের কোনটি একটি বিকল্প যোজকের উদাহরণ?",
+    "options": [
+      "কিন্তু",
+      "অথবা",
+      "কারণ",
+      "সুতরাং"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 21,
+    "question": "নিচের কোনটি একটি বিরোধ যোজকের উদাহরণ?",
+    "options": [
+      "আর",
+      "ও",
+      "তবু",
+      "যদি"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 22,
+    "question": "নিচের কোনটি একটি কারণ যোজকের উদাহরণ?",
+    "options": [
+      "অথবা",
+      "সুতরাং",
+      "যদি",
+      "তবু"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 23,
+    "question": "নিচের কোনটি একটি সাপেক্ষ যোজকের উদাহরণ?",
+    "options": [
+      "তাই",
+      "তবু",
+      "যতই...ততই",
+      "কিন্তু"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 24,
+    "question": "'ও' কী ধরনের যোজক?",
+    "options": [
+      "সাধারণ যোজক",
+      "বিকল্প যোজক",
+      "বিরোধ যোজক",
+      "কারণ যোজক"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 25,
+    "question": "'অথবা' কী ধরনের যোজক?",
+    "options": [
+      "সাধারণ যোজক",
+      "বিকল্প যোজক",
+      "বিরোধ যোজক",
+      "কারণ যোজক"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 26,
+    "question": "'তবু' কী ধরনের যোজক?",
+    "options": [
+      "সাধারণ যোজক",
+      "বিকল্প যোজক",
+      "বিরোধ যোজক",
+      "কারণ যোজক"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 27,
+    "question": "'সুতরাং' কী ধরনের যোজক?",
+    "options": [
+      "সাধারণ যোজক",
+      "বিকল্প যোজক",
+      "বিরোধ যোজক",
+      "কারণ যোজক"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 28,
+    "question": "'যদি' কী ধরনের যোজক?",
+    "options": [
+      "কারণ যোজক",
+      "সাপেক্ষ যোজক",
+      "সাধারণ যোজক",
+      "বিকল্প যোজক"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 29,
+    "question": "'যত...ততই' কোন যোজকের উদাহরণ?",
+    "options": [
+      "সাধারণ",
+      "বিকল্প",
+      "বিরোধ",
+      "সাপেক্ষ"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 30,
+    "question": "'কিন্তু' কোন যোজকের উদাহরণ?",
+    "options": [
+      "সাধারণ",
+      "বিকল্প",
+      "বিরোধ",
+      "কারণ"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 31,
+    "question": "'কারণ' কোন যোজকের উদাহরণ?",
+    "options": [
+      "সাধারণ",
+      "বিকল্প",
+      "বিরোধ",
+      "কারণ"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 32,
+    "question": "'ও' এবং 'এবং' এর মধ্যে কী ধরনের পার্থক্য রয়েছে?",
+    "options": [
+      "কোনো পার্থক্য নেই, উভয়ই একই ধরনের যোজক।",
+      "'ও' ব্যক্তি বা বস্তুকে যোগ করে, 'এবং' বাক্যকে যোগ করে।",
+      "'ও' সাধারণ যোজক, 'এবং' বিকল্প যোজক।",
+      "'ও' বিকল্প যোজক, 'এবং' সাধারণ যোজক।"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 33,
+    "question": "কোন ধরনের যোজক দুটি শব্দ বা বাক্যকে যোগ করে?",
+    "options": [
+      "বিকল্প যোজক",
+      "সাধারণ যোজক",
+      "সাপেক্ষ যোজক",
+      "বিরোধ যোজক"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 34,
+    "question": "কোন ধরনের যোজক দুটি বিকল্পের মধ্যে একটিকে বেছে নেওয়ার সুযোগ দেয়?",
+    "options": [
+      "সাধারণ যোজক",
+      "বিকল্প যোজক",
+      "বিরোধ যোজক",
+      "কারণ যোজক"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 35,
+    "question": "কোন ধরনের যোজক পূর্ববর্তী বাক্যের বক্তব্যের সঙ্গে বিপরীত অর্থ প্রকাশ করে?",
+    "options": [
+      "সাধারণ যোজক",
+      "কারণ যোজক",
+      "বিরোধ যোজক",
+      "সাপেক্ষ যোজক"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 36,
+    "question": "কোন ধরনের যোজক একটি কারণ এবং তার ফলাফলকে সংযুক্ত করে?",
+    "options": [
+      "সাধারণ যোজক",
+      "বিকল্প যোজক",
+      "বিরোধ যোজক",
+      "কারণ যোজক"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 37,
+    "question": "কোন ধরনের যোজক একে অপরের ওপর নির্ভরশীল হয়ে ব্যবহৃত হয়?",
+    "options": [
+      "সাধারণ যোজক",
+      "বিকল্প যোজক",
+      "বিরোধ যোজক",
+      "সাপেক্ষ যোজক"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 38,
+    "question": "'রহিম ও করিম এই কাজটি করেছে।' — এই বাক্যের 'ও' দ্বারা কী যুক্ত হয়েছে?",
+    "options": [
+      "দুটি বাক্য",
+      "দুটি পদ",
+      "একটি পদ ও একটি বাক্য",
+      "দুটি ক্রিয়াপদ"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 39,
+    "question": "'জলদি দোকানে যাও এবং পাউরুটি কিনে আনো।' — এই বাক্যের 'এবং' দ্বারা কী যুক্ত হয়েছে?",
+    "options": [
+      "দুটি শব্দ",
+      "দুটি বাক্য",
+      "দুটি ক্রিয়াপদ",
+      "দুটি বিশেষ্য পদ"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 40,
+    "question": "'লাল বা নীল কলমটা আনো।' — এই বাক্যের 'বা' দ্বারা কী নির্দেশ করা হয়েছে?",
+    "options": [
+      "কারণ",
+      "বিকল্প",
+      "বিরোধ",
+      "সম্পর্ক"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 41,
+    "question": "'এত পড়লাম, কিন্তু পরীক্ষায় ভালো করতে পারলাম না।' — এই বাক্যে কীসের বিরোধ প্রকাশ পেয়েছে?",
+    "options": [
+      "পড়া এবং পরীক্ষার ফলাফল",
+      "পড়া এবং ভালো না করা",
+      "ভালো করা এবং পরীক্ষা",
+      "কোনোটিই নয়"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 42,
+    "question": "'বসার সময় নেই, তাই যেতে হচ্ছে।' — এই বাক্যে কীসের কারণ দেখানো হয়েছে?",
+    "options": [
+      "বসার সময়ের অভাব",
+      "যাওয়ার কারণ",
+      "বসার সময় না থাকা এবং যাওয়া",
+      "কোনোটিই নয়"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 43,
+    "question": "'যদি রোদ ওঠে, তবে রওনা দেব।' — এই বাক্যে 'রওনা দেব' এটি কীসের ওপর নির্ভর করছে?",
+    "options": [
+      "রোদের ওঠার ওপর",
+      "সময়ের ওপর",
+      "স্থানের ওপর",
+      "কোনোটিই নয়"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 44,
+    "question": "'যোজক' শব্দের অর্থ কী?",
+    "options": [
+      "সংযোগকারী",
+      "বিয়োগকারী",
+      "বিভাজনকারী",
+      "পরিবর্তনকারী"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 45,
+    "question": "'সাধারণ যোজক' কোন ধরনের সংযোগ স্থাপন করে?",
+    "options": [
+      "শর্তমূলক সংযোগ",
+      "সরল সংযোগ",
+      "বিপরীতমুখী সংযোগ",
+      "কার্যকারণ সম্পর্ক"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 46,
+    "question": "'বিকল্প যোজক' দ্বারা কী প্রকাশ পায়?",
+    "options": [
+      "কারণ",
+      "সম্পর্ক",
+      "দুইটি বিষয়ের মধ্যে যেকোনো একটি",
+      "দুটি বিপরীত বিষয়"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 47,
+    "question": "'বিরোধ যোজক' দ্বারা কী প্রকাশ পায়?",
+    "options": [
+      "দুটি বিষয়ের মধ্যে ঐক্য",
+      "দুটি বিপরীত বিষয়ের মধ্যে সম্পর্ক",
+      "কারণ",
+      "বিকল্প"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 48,
+    "question": "'কারণ যোজক' দ্বারা কী প্রকাশ পায়?",
+    "options": [
+      "দুটি বিষয়ের মধ্যে সাদৃশ্য",
+      "দুটি বিষয়ের মধ্যে পার্থক্য",
+      "একটি বিষয়ের কারণ ও ফলাফল",
+      "দুটি বিকল্প"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 49,
+    "question": "'সাপেক্ষ যোজক' দ্বারা কী প্রকাশ পায়?",
+    "options": [
+      "এটির উপর অন্যটির নির্ভরতা",
+      "দুইটি স্বাধীন বিষয়",
+      "দুইটি বিপরীত বিষয়",
+      "দুইটি বিকল্প"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 50,
+    "question": "'যোজক' এর আরেকটি নাম কী?",
+    "options": [
+      "অব্যয়",
+      "সংযোজক অব্যয়",
+      "বিভক্তি",
+      "প্রত্যয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 51,
+    "question": "'তবে' কী ধরনের যোজক?",
+    "options": [
+      "কারণ যোজক",
+      "সাপেক্ষ যোজক",
+      "বিরোধ যোজক",
+      "সাধারণ যোজক"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 52,
+    "question": "'তবু' এবং 'কিন্তু' কীসের উদাহরণ?",
+    "options": [
+      "সাধারণ যোজক",
+      "বিকল্প যোজক",
+      "বিরোধ যোজক",
+      "কারণ যোজক"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 53,
+    "question": "'কারণ' এবং 'তাই' কীসের উদাহরণ?",
+    "options": [
+      "সাধারণ যোজক",
+      "কারণ যোজক",
+      "বিকল্প যোজক",
+      "সাপেক্ষ যোজক"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 54,
+    "question": "'যদি' এবং 'যত' কীসের উদাহরণ?",
+    "options": [
+      "সাপেক্ষ যোজক",
+      "কারণ যোজক",
+      "সাধারণ যোজক",
+      "বিরোধ যোজক"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 55,
+    "question": "'এবং', 'ও', 'আর' এই যোজকগুলোর মধ্যে কোনটি বাক্যকে যোগ করতে পারে?",
+    "options": [
+      "এবং",
+      "ও",
+      "আর",
+      "উপরের সবগুলো"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 56,
+    "question": "'অথবা' এবং 'বা' এই যোজকগুলোর মধ্যে কোনটি শব্দকে যোগ করতে পারে?",
+    "options": [
+      "অথবা",
+      "বা",
+      "ক এবং খ উভয়ই",
+      "কোনোটিই নয়"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 57,
+    "question": "'যদি রোদ ওঠে, তবে রওনা দেব।' বাক্যটি কোন শ্রেণির যোজকের উদাহরণ?",
+    "options": [
+      "সরল যোজক",
+      "যৌগিক যোজক",
+      "সাপেক্ষ যোজক",
+      "কারণ যোজক"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 58,
+    "question": "'বসার সময় নেই, তাই যেতে হচ্ছে।' বাক্যটিতে কোন ধরনের সম্পর্ক প্রকাশ পেয়েছে?",
+    "options": [
+      "বিকল্প",
+      "শর্ত",
+      "কারণ ও ফলাফল",
+      "বিরোধ"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 59,
+    "question": "'জিনিসের দাম বেড়েছে, কারণ চাহিদা বেশি।' বাক্যটিতে কোন ধরনের যোজক ব্যবহৃত হয়েছে?",
+    "options": [
+      "সাধারণ",
+      "বিকল্প",
+      "বিরোধ",
+      "কারণ"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 60,
+    "question": "'এত পড়লাম, কিন্তু পরীক্ষায় ভালো করতে পারলাম না।' এই বাক্যের 'কিন্তু' যোজকটি কী প্রকাশ করছে?",
+    "options": [
+      "কারণ",
+      "বিকল্প",
+      "বিরোধ",
+      "সাপেক্ষ সম্পর্ক"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 61,
+    "question": "'লাল বা নীল কলমটা আনো।' এই বাক্যের 'বা' যোজকটি কী নির্দেশ করছে?",
+    "options": [
+      "উভয়টি",
+      "একটিকে বাদ দেওয়া",
+      "বিকল্প",
+      "কারণ"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 62,
+    "question": "'রহিম ও করিম এই কাজটি করেছে।' এই বাক্যে 'ও' যোজকটি কী প্রকাশ করছে?",
+    "options": [
+      "বিকল্প",
+      "কারণ",
+      "সংযোগ",
+      "বিরোধ"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 63,
+    "question": "যেসব যোজক দুটি শব্দ বা বাক্যকে যোগ করে, সেগুলো কী ধরনের যোজক?",
+    "options": [
+      "সাধারণ যোজক",
+      "বিকল্প যোজক",
+      "বিরোধ যোজক",
+      "সাপেক্ষ যোজক"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 64,
+    "question": "'না-হয়' কোন ধরনের যোজক?",
+    "options": [
+      "সাধারণ",
+      "বিকল্প",
+      "বিরোধ",
+      "কারণ"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 65,
+    "question": "'যোজক' ব্যাকরণের কোন অংশের আলোচ্য বিষয়?",
+    "options": [
+      "রূপতত্ত্ব",
+      "বাক্যতত্ত্ব",
+      "শব্দতত্ত্ব",
+      "ধ্বনিতত্ত্ব"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 66,
+    "question": "'যদি' এবং 'তবে' যোজক দুটি কী নির্দেশ করে?",
+    "options": [
+      "কারণ",
+      "কার্য",
+      "শর্ত",
+      "ফল"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 67,
+    "question": "'যত' এবং 'ততই' যোজক দুটি কী নির্দেশ করে?",
+    "options": [
+      "শর্ত",
+      "কার্য",
+      "সম্পর্ক",
+      "পরিমাণ"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 68,
+    "question": "'জিনিসের দাম বেড়েছে' - এই বাক্যটি 'কারণ চাহিদা বেশি' বাক্যের কী?",
+    "options": [
+      "কারণ",
+      "ফলাফল",
+      "উদ্দেশ্য",
+      "বিকল্প"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 69,
+    "question": "'চাহিদা বেশি' - এই বাক্যটি 'জিনিসের দাম বেড়েছে' বাক্যের কী?",
+    "options": [
+      "ফলাফল",
+      "কারণ",
+      "উদ্দেশ্য",
+      "বিকল্প"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 70,
+    "question": "'যত পড়ছি, ততই নতুন করে জানছি।' - এই বাক্যে 'যত' দ্বারা কী বোঝানো হয়েছে?",
+    "options": [
+      "পরিমাণ",
+      "স্থান",
+      "সময়",
+      "শর্ত"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 71,
+    "question": "'যত পড়ছি, ততই নতুন করে জানছি।' - এই বাক্যে 'ততই' দ্বারা কী বোঝানো হয়েছে?",
+    "options": [
+      "ফলাফল",
+      "পরিমাণ",
+      "শর্ত",
+      "স্থান"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 72,
+    "question": "কোন যোজকটি দুটি বাক্যকে এক করে?",
+    "options": [
+      "ও",
+      "এবং",
+      "আর",
+      "উপরের সবগুলো"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 73,
+    "question": "কোন যোজকটি দুটি শব্দকে এক করে?",
+    "options": [
+      "এবং",
+      "ও",
+      "আর",
+      "উপরের সবগুলো"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 74,
+    "question": "'জলদি দোকানে যাও' এবং 'পাউরুটি কিনে আনো' - এই দুটি বাক্যকে কোন যোজকটি যুক্ত করেছে?",
+    "options": [
+      "এবং",
+      "ও",
+      "আর",
+      "সুতরাং"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 75,
+    "question": "'এত পড়লাম' এবং 'পরীক্ষায় ভালো করতে পারলাম না' - এই দুটি বাক্যের মধ্যে কোন যোজকটি বিরোধ সম্পর্ক তৈরি করেছে?",
+    "options": [
+      "কারণ",
+      "তবু",
+      "তাই",
+      "যদি"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 76,
+    "question": "'বিকল্প যোজক' কোন ধরনের কাজ করে?",
+    "options": [
+      "দুটি বাক্যকে যোগ করে",
+      "দুটি বিপরীত ধারণার মধ্যে যোগসূত্র স্থাপন করে",
+      "দুটি বিকল্পের মধ্যে যেকোনো একটি বেছে নেওয়ার সুযোগ দেয়",
+      "দুটি বাক্যের মধ্যে কার্যকারণ সম্পর্ক স্থাপন করে"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 77,
+    "question": "'কারণ যোজক' কোন ধরনের কাজ করে?",
+    "options": [
+      "দুটি বাক্যের মধ্যে সরল সম্পর্ক স্থাপন করে",
+      "দুটি বাক্যের মধ্যে শর্তমূলক সম্পর্ক স্থাপন করে",
+      "দুটি বাক্যের মধ্যে কার্যকারণ সম্পর্ক স্থাপন করে",
+      "দুটি বাক্যের মধ্যে বিরোধমূলক সম্পর্ক স্থাপন করে"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 78,
+    "question": "'সাপেক্ষ যোজক' কোন ধরনের কাজ করে?",
+    "options": [
+      "দুটি স্বাধীন বাক্যকে যুক্ত করে",
+      "দুটি নির্ভরশীল বাক্যকে যুক্ত করে",
+      "দুটি বিপরীত বাক্যকে যুক্ত করে",
+      "দুটি বিকল্প বাক্যকে যুক্ত করে"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 79,
+    "question": "'সাধারণ যোজক' কোন ধরনের কাজ করে?",
+    "options": [
+      "দুটি শব্দের মধ্যে বিকল্প সম্পর্ক স্থাপন করে",
+      "দুটি শব্দের মধ্যে বিরোধ সম্পর্ক স্থাপন করে",
+      "দুটি শব্দ বা বাক্যের মধ্যে সরল সংযোগ স্থাপন করে",
+      "দুটি শব্দের মধ্যে কার্যকারণ সম্পর্ক স্থাপন করে"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 80,
+    "question": "'না-হয়' যোজকটি কোন দুটি বাক্যের মধ্যে ব্যবহৃত হতে পারে?",
+    "options": [
+      "তুমি যাবে না-হয় আমি যাব।",
+      "সে বলল না-হয় আমি যাব।",
+      "তুমি খাও না-হয় সে খাবে।",
+      "উপরের সবগুলো"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 81,
+    "question": "'সুতরাং' যোজকটি কোন বাক্যে ব্যবহৃত হয়?",
+    "options": [
+      "সে অসুস্থ, সুতরাং সে আসতে পারবে না।",
+      "সে অসুস্থ, সুতরাং সে আসবে।",
+      "সে অসুস্থ, সুতরাং সে খেলবে।",
+      "উপরের কোনোটিই নয়।"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 82,
+    "question": "'যত পড়ছি, ততই নতুন করে জানছি।' এই বাক্যের মতো আরেকটি সাপেক্ষ যোজকের উদাহরণ কোনটি?",
+    "options": [
+      "তুমি যদি আসো, তবে আমি যাব।",
+      "তুমি অথবা আমি যাব।",
+      "তুমি এলে, কিন্তু আমি গেলাম না।",
+      "তুমি এলে কারণ আমি গেলাম না।"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 83,
+    "question": "'রহিম ও করিম' এই দুটি পদের মধ্যে 'ও' যোজকটি কোন সম্পর্ক স্থাপন করেছে?",
+    "options": [
+      "বিকল্প",
+      "বিরোধ",
+      "সংযোগ",
+      "সাপেক্ষ"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 84,
+    "question": "'যদি রোদ ওঠে', এই বাক্যটি 'তবে রওনা দেব' বাক্যের কী?",
+    "options": [
+      "ফলাফল",
+      "কারণ",
+      "শর্ত",
+      "উদ্দেশ্য"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 85,
+    "question": "'যত' এবং 'ততই' যোজক দ্বারা কীসের সম্পর্ক বোঝানো হয়েছে?",
+    "options": [
+      "কারণ ও ফলাফল",
+      "শর্ত ও ফলাফল",
+      "পরিমাণ ও ফলাফল",
+      "সময় ও ফলাফল"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 86,
+    "question": "'ও', 'এবং', 'আর' - এই যোজকগুলোর মূল কাজ কী?",
+    "options": [
+      "দুটি বিষয়ের মধ্যে বিকল্প দেওয়া",
+      "দুটি বিষয়ের মধ্যে বিরোধ স্থাপন করা",
+      "দুটি বিষয়কে যুক্ত করা",
+      "দুটি বিষয়ের মধ্যে কারণ সম্পর্ক স্থাপন করা"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 87,
+    "question": "'বা', 'অথবা', 'না-হয়' - এই যোজকগুলোর মূল কাজ কী?",
+    "options": [
+      "দুটি বিষয়কে যুক্ত করা",
+      "দুটি বিষয়ের মধ্যে বিকল্প দেওয়া",
+      "দুটি বিষয়ের মধ্যে বিরোধ স্থাপন করা",
+      "দুটি বিষয়ের মধ্যে কারণ সম্পর্ক স্থাপন করা"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 88,
+    "question": "'কিন্তু', 'তবু', 'বরং' - এই যোজকগুলোর মূল কাজ কী?",
+    "options": [
+      "দুটি বিষয়কে যুক্ত করা",
+      "দুটি বিষয়ের মধ্যে বিকল্প দেওয়া",
+      "দুটি বিষয়ের মধ্যে বিরোধ স্থাপন করা",
+      "দুটি বিষয়ের মধ্যে কারণ সম্পর্ক স্থাপন করা"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 89,
+    "question": "'কারণ', 'সুতরাং', 'তাই' - এই যোজকগুলোর মূল কাজ কী?",
+    "options": [
+      "দুটি বিষয়কে যুক্ত করা",
+      "দুটি বিষয়ের মধ্যে বিকল্প দেওয়া",
+      "দুটি বিষয়ের মধ্যে বিরোধ স্থাপন করা",
+      "দুটি বিষয়ের মধ্যে কারণ সম্পর্ক স্থাপন করা"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 90,
+    "question": "'যদি', 'তবে', 'যত', 'ততই' -এই যোজকগুলোর মূল কাজ কী?",
+    "options": [
+      "দুটি বিষয়ের মধ্যে সাপেক্ষ সম্পর্ক স্থাপন করা",
+      "দুটি বিষয়ের মধ্যে বিকল্প দেওয়া",
+      "দুটি বিষয়ের মধ্যে বিরোধ স্থাপন করা",
+      "দুটি বিষয়ের মধ্যে কারণ সম্পর্ক স্থাপন করা"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 91,
+    "question": "'বিকল্প যোজক' দ্বারা কী বোঝানো হয়?",
+    "options": [
+      "একাধিকের মধ্যে একটিকে বেছে নেওয়ার স্বাধীনতা",
+      "দুটি বাক্যকে একত্রে যোগ করা",
+      "একটি বাক্যের সঙ্গে অন্য বাক্যের সম্পর্ক স্থাপন করা",
+      "দুটি বাক্যের মধ্যে বিরোধ তৈরি করা"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 92,
+    "question": "'সাধারণ যোজক' এর একটি কাজ কী?",
+    "options": [
+      "একটি বাক্যকে অন্য বাক্যের কারণ হিসেবে দেখানো",
+      "দুটি স্বাধীন পদকে যুক্ত করা",
+      "একটি শর্তের ফলাফল দেখানো",
+      "দুটি বিপরীত ধারণাকে সংযুক্ত করা"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 93,
+    "question": "'বিরোধ যোজক' এর একটি কাজ কী?",
+    "options": [
+      "একটি বাক্যের বক্তব্যকে সমর্থন করা",
+      "একটি বাক্যের বক্তব্যকে বিপরীতভাবে উপস্থাপন করা",
+      "একটি বাক্যের কারণ ব্যাখ্যা করা",
+      "একটি বাক্যের বিকল্প দেখানো"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 94,
+    "question": "'কারণ যোজক' এর একটি কাজ কী?",
+    "options": [
+      "একটি শর্তের ফলাফল দেখানো",
+      "একটি কারণের ব্যাখ্যা দেওয়া",
+      "দুটি স্বাধীন পদকে যুক্ত করা",
+      "দুটি বিকল্পের মধ্যে একটি বেছে নেওয়া"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 95,
+    "question": "'সাপেক্ষ যোজক' এর একটি কাজ কী?",
+    "options": [
+      "দুটি স্বাধীন বাক্যকে যুক্ত করা",
+      "এটির উপর অন্যটির নির্ভরশীলতা বোঝানো",
+      "দুটি বিপরীত ধারণাকে সংযুক্ত করা",
+      "দুটি বিকল্পকে দেখানো"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 96,
+    "question": "'জলদি দোকানে যাও এবং পাউরুটি কিনে আনো।' এই বাক্যে 'এবং' এর বদলে অন্য কোন যোজক ব্যবহার করা যায়?",
+    "options": [
+      "ও",
+      "বা",
+      "কিন্তু",
+      "সুতরাং"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 97,
+    "question": "'লাল বা নীল কলমটা আনো।' এই বাক্যে 'বা' এর বদলে অন্য কোন যোজক ব্যবহার করা যায়?",
+    "options": [
+      "এবং",
+      "ও",
+      "অথবা",
+      "তবু"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 98,
+    "question": "'তাকে আসতে বললাম, তবু এল না।' এই বাক্যে 'তবু' এর বদলে অন্য কোন যোজক ব্যবহার করা যায়?",
+    "options": [
+      "কারণ",
+      "সুতরাং",
+      "কিন্তু",
+      "যদি"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 99,
+    "question": "'জিনিসের দাম বেড়েছে, কারণ চাহিদা বেশি।' এই বাক্যে 'কারণ' এর বদলে অন্য কোন যোজক ব্যবহার করা যায়?",
+    "options": [
+      "তাই",
+      "সুতরাং",
+      "কারণ",
+      "ক এবং খ উভয়ই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 100,
+    "question": "'যদি রোদ ওঠে, তবে রওনা দেব।' এই বাক্যে 'তবে' এর বদলে অন্য কোন যোজক ব্যবহার করা যায়?",
+    "options": [
+      "সুতরাং",
+      "তাই",
+      "তবে",
+      "ক, খ উভয়ই"
+    ],
+    "answer": 2
+  }
+];
+
+let currentQuestion = 0;
+let score = 0;
+let wrongAnswers = [];
+let timer;
+let timeLeft = 30;
+let paused = false;
+
+const questionEl = document.getElementById("question");
+const optionsEl = document.getElementById("options");
+const progressBar = document.getElementById("progress-bar");
+const timerBar = document.getElementById("timer-bar");
+const scoreEl = document.getElementById("score");
+const currentQuestionEl = document.getElementById("current-question");
+const totalQuestionsEl = document.getElementById("total-questions");
+const quizContainer = document.getElementById("quiz-container");
+const startScreen = document.getElementById("start-screen");
+const resultScreen = document.getElementById("result-screen");
+const finalScore = document.getElementById("final-score");
+const wrongSummary = document.getElementById("wrong-summary");
+
+totalQuestionsEl.innerText = quizData.length;
+
+function startQuiz() {
+    startScreen.style.display = "none";
+    quizContainer.style.display = "block";
+    currentQuestion = 0;
+    score = 0;
+    wrongAnswers = [];
+    updateScore();
+    showQuestion();
+    openFullscreen();
+}
+
+function showQuestion() {
+    if (currentQuestion >= quizData.length) {
+        endQuiz();
+        return;
+    }
+
+    timeLeft = 30;
+    updateTimer();
+    startTimer();
+
+    const q = quizData[currentQuestion];
+    questionEl.innerText = `${q.id}. ${q.question}`; // Show serial from JSON
+    adjustFontSize(questionEl, q.question, 6);
+
+    optionsEl.innerHTML = "";
+    q.options.forEach((option, index) => {
+        const btn = document.createElement("div");
+        btn.classList.add("option");
+        btn.innerText = option;
+        adjustFontSize(btn, option, 4);
+        btn.addEventListener("click", () => selectAnswer(index));
+        optionsEl.appendChild(btn);
+    });
+
+    currentQuestionEl.innerText = currentQuestion + 1;
+    progressBar.style.width = ((currentQuestion / quizData.length) * 100) + "%";
+}
+
+// Dynamic font adjustment
+function adjustFontSize(el, text, maxSize) {
+    let size = maxSize - Math.floor(text.length / 25);
+    if (size < 3) size = 3;
+    el.style.fontSize = size + "vw";
+}
+
+function selectAnswer(index) {
+    stopTimer();
+    const q = quizData[currentQuestion];
+    const optionEls = document.querySelectorAll(".option");
+
+    if (index === q.answer) {
+        optionEls[index].classList.add("correct");
+        score++;
+    } else {
+        optionEls[index].classList.add("wrong");
+        optionEls[q.answer].classList.add("correct");
+        wrongAnswers.push(q);
+    }
+
+    updateScore();
+    setTimeout(() => {
+        currentQuestion++;
+        showQuestion();
+    }, 1000);
+}
+
+function updateScore() { scoreEl.innerText = `Score: ${score}`; }
+
+function startTimer() {
+    timerBar.style.width = "100%";
+    timer = setInterval(() => {
+        if (!paused) {
+            timeLeft--;
+            timerBar.style.width = (timeLeft / 30 * 100) + "%";
+            if (timeLeft <= 0) {
+                stopTimer();
+                wrongAnswers.push(quizData[currentQuestion]);
+                currentQuestion++;
+                showQuestion();
+            }
+        }
+    }, 1000);
+}
+
+function stopTimer() { clearInterval(timer); }
+function updateTimer() { timerBar.style.width = "100%"; }
+function pauseQuiz() { paused = true; }
+function resumeQuiz() { paused = false; }
+function stopQuiz() { stopTimer(); endQuiz(); }
+
+function endQuiz() {
+    quizContainer.style.display = "none";
+    resultScreen.style.display = "flex";
+    finalScore.innerText = `${score} / ${quizData.length}`;
+    if(wrongAnswers.length > 0){
+        wrongSummary.innerText = `Wrong Answers: ${wrongAnswers.length} / ${quizData.length}`;
+    } else {
+        wrongSummary.innerText = "";
+    }
+}
+
+function restartQuiz() {
+    resultScreen.style.display = "none";
+    startScreen.style.display = "flex";
+}
+
+function retryWrong() {
+    if (wrongAnswers.length === 0) return;
+    quizData.splice(0, quizData.length, ...wrongAnswers);
+    resultScreen.style.display = "none";
+    quizContainer.style.display = "block";
+    currentQuestion = 0;
+    score = 0;
+    wrongAnswers = [];
+    updateScore();
+    showQuestion();
+}
+
+function openFullscreen() {
+    const elem = document.documentElement;
+    if (elem.requestFullscreen) { elem.requestFullscreen(); }
+    else if (elem.webkitRequestFullscreen) { elem.webkitRequestFullscreen(); }
+    else if (elem.msRequestFullscreen) { elem.msRequestFullscreen(); }
+}
+</script>
+
+</body>
+</html>

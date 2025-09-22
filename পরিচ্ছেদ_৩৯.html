@@ -1,0 +1,1421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Full-Screen MCQ Quiz</title>
+<style>
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #1a1a1a;
+    font-family: Arial, sans-serif;
+    color: #fff;
+    overflow: hidden;
+}
+
+#quiz-container {
+    display: none;
+    width: 100%;
+    height: 100%;
+    position: relative;
+}
+
+.question {
+    text-align: center;
+    margin: 3% auto;
+    word-wrap: break-word;
+    font-weight: bold;
+}
+
+.options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 3%;
+    width: 85%;
+    height: 60%;
+    margin: 0 auto;
+}
+
+.option {
+    background-color: #333;
+    border: 2px solid #00ffff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold;
+    font-size: 4vw;
+    cursor: pointer;
+    text-align: center;
+    padding: 1%;
+    border-radius: 10px;
+    transition: 0.3s;
+}
+
+.option.correct { background-color: #00cc00; color: #000; }
+.option.wrong { background-color: #cc0000; color: #000; }
+
+.top-bar {
+    width: 100%;
+    height: 60px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 2%;
+    box-sizing: border-box;
+    font-size: 1.8vw;
+}
+
+.progress-container, .timer-container {
+    width: 35%;
+    background: #333;
+    border-radius: 25px;
+    overflow: hidden;
+}
+
+.progress-bar, .timer-bar {
+    height: 25px;
+    width: 0;
+    background-color: #00ffff;
+    transition: width 0.3s;
+}
+
+.score { color: #00ff00; }
+
+.control-buttons {
+    position: absolute;
+    top: 50%;
+    right: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.control-buttons button {
+    background-color: #333;
+    border: 2px solid #00ffff;
+    color: #fff;
+    font-weight: bold;
+    cursor: pointer;
+    border-radius: 10px;
+    transition: 0.3s;
+    padding: 10px 15px;
+    text-align: center;
+}
+
+#start-screen, #result-screen {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+    flex-direction: column;
+}
+
+#start-screen button, #result-screen button {
+    font-size: 3.5vw;
+    padding: 15px 30px;
+    cursor: pointer;
+    border-radius: 15px;
+    border: none;
+    background-color: #00ffff;
+    color: #000;
+    margin-top: 20px;
+}
+</style>
+</head>
+<body>
+
+<div id="start-screen">
+    <h1>Welcome to the Quiz!</h1>
+    <button onclick="startQuiz()">Start Quiz</button>
+</div>
+
+<div id="quiz-container">
+    <div class="top-bar">
+        <div>Q No: <span id="current-question">1</span> / <span id="total-questions"></span></div>
+        <div class="progress-container">
+            <div class="progress-bar" id="progress-bar"></div>
+        </div>
+        <div class="timer-container">
+            <div class="timer-bar" id="timer-bar"></div>
+        </div>
+        <div class="score" id="score">Score: 0</div>
+    </div>
+
+    <div class="question" id="question"></div>
+    <div class="options" id="options"></div>
+
+    <div class="control-buttons">
+        <button id="pause-btn" onclick="pauseQuiz()">Pause</button>
+        <button id="resume-btn" onclick="resumeQuiz()">Resume</button>
+        <button id="stop-btn" onclick="stopQuiz()">Stop</button>
+    </div>
+</div>
+
+<div id="result-screen">
+    <h1>Your Score: <span id="final-score"></span></h1>
+    <h2 id="wrong-summary"></h2>
+    <button onclick="retryWrong()">Retry Wrong Answers</button>
+    <button onclick="restartQuiz()">Restart Quiz</button>
+</div>
+
+<script>
+// JSON formatted questions
+const quizData = [
+  {
+    "id": 1,
+    "question": "ভাষা ব্যবহারের প্রধান উদ্দেশ্য কী?",
+    "options": [
+      "শব্দ ব্যবহার করা",
+      "বাগর্থ প্রকাশ করা",
+      "মনের ভাব প্রকাশ করা",
+      "অভিধানে অর্থ খুঁজে বের করা"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 2,
+    "question": "শব্দ ও শব্দগুচ্ছের অর্থকে কী বলে?",
+    "options": [
+      "বাচ্যার্থ",
+      "লক্ষ্যার্থ",
+      "বাগর্থ",
+      "ব্যুৎপত্তিগত অর্থ"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 3,
+    "question": "অভিধানে অর্থ গ্রহণের বেলায় শব্দের কোন অর্থকে প্রাধান্য দেওয়া হয়?",
+    "options": [
+      "লক্ষ্যার্থ",
+      "গৌণার্থ",
+      "বাগর্থ",
+      "বাচ্যার্থ"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 4,
+    "question": "শব্দের মুখ্য অর্থকে কী বলা হয়?",
+    "options": [
+      "লক্ষ্যার্থ",
+      "আক্ষরিক অর্থ",
+      "গৌণার্থ",
+      "লাক্ষণিক অর্থ"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 5,
+    "question": "'মাথা' শব্দের বাচ্যার্থ কী?",
+    "options": [
+      "মাননীয় ব্যক্তি",
+      "শরীরের ঊর্ধ্বাঙ্গ",
+      "নেতৃত্ব",
+      "বুদ্ধি"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 6,
+    "question": "একটি শব্দের বাচ্যার্থের বাইরে যে আলাদা অর্থ তৈরি হয়, তাকে কী বলে?",
+    "options": [
+      "বাচ্যার্থ",
+      "বাগর্থ",
+      "লক্ষ্যার্থ",
+      "মুখ্য অর্থ"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 7,
+    "question": "'তিনি গ্রামের মাথা।' — এখানে 'মাথা' শব্দের লক্ষ্যার্থ কী?",
+    "options": [
+      "শরীরের ঊর্ধ্বাঙ্গ",
+      "বুদ্ধি",
+      "মাননীয় ব্যক্তি",
+      "নেতৃত্ব"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 8,
+    "question": "লক্ষ্যার্থকে আর কী কী নামে ডাকা হয়?",
+    "options": [
+      "গৌণার্থ বা লাক্ষণিক অর্থ",
+      "মুখ্য অর্থ বা আক্ষরিক অর্থ",
+      "বাচ্যার্থ বা বাগর্থ",
+      "কোনোটিই নয়"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 9,
+    "question": "একটি শব্দ পূর্বে যে অর্থ প্রকাশ করতো, তার থেকে আরো ব্যাপক অর্থ প্রকাশ করলে কী ঘটে?",
+    "options": [
+      "অর্থসংকোচ",
+      "অর্থের উন্নতি",
+      "অর্থপ্রসার",
+      "অর্থের অবনতি"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 10,
+    "question": "'অঞ্চল' শব্দের মূল অর্থ কী?",
+    "options": [
+      "এলাকা",
+      "শাড়ির পাড়",
+      "জেলা",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 11,
+    "question": "'বর্ষ' শব্দের পূর্ববর্তী অর্থ কী?",
+    "options": [
+      "বছর",
+      "বর্ষাকাল",
+      "ছয় ঋতু",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 12,
+    "question": "অর্থসংকোচের ফলে একটি শব্দের পূর্ববর্তী অর্থের ব্যাপ্তি কী হয়?",
+    "options": [
+      "বাড়ে",
+      "কমে",
+      "একই থাকে",
+      "পরিবর্তন হয় না"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 13,
+    "question": "এক সময়ে 'মৃগ' শব্দের দ্বারা কী বোঝানো হতো?",
+    "options": [
+      "কেবল হরিণ",
+      "সকল পশু",
+      "পশুশিকার",
+      "পশুদের রাজা"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 14,
+    "question": "বর্তমানে 'মৃগ' শব্দের অর্থ কী?",
+    "options": [
+      "সকল পশু",
+      "পশুশিকার",
+      "হরিণ",
+      "সিংহ"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 15,
+    "question": "'অন্ন' বলতে এক সময়ে কী বোঝানো হতো?",
+    "options": [
+      "কেবল ভাত",
+      "যে-কোনো খাদ্য",
+      "মিষ্টান্ন",
+      "পলান্ন"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 16,
+    "question": "একটি শব্দের অর্থ আগের চেয়ে ভালো অর্থ ধারণ করলে কী হয়?",
+    "options": [
+      "অর্থের অবনতি",
+      "অর্থের উন্নতি",
+      "অর্থসংকোচ",
+      "অর্থপ্রসার"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 17,
+    "question": "'অপরূপ' শব্দের পূর্ববর্তী অর্থ কী ছিল?",
+    "options": [
+      "অনির্বচনীয় সৌন্দর্য",
+      "শ্রীহীনতা",
+      "রূপ",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 18,
+    "question": "'সাহস' শব্দের পূর্বতন অর্থ কী ছিল?",
+    "options": [
+      "নির্ভীকতা",
+      "ঝুঁকিপূর্ণ কাজে উদ্যম",
+      "চুরি, ডাকাতি প্রভৃতি",
+      "কোনোটিই নয়"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 19,
+    "question": "'দ্বন্দ্ব' শব্দের মূল অর্থ কী ছিল?",
+    "options": [
+      "বিরোধ",
+      "মিলন",
+      "যুদ্ধ",
+      "ঘৃণা"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 20,
+    "question": "নেতিবাচক অর্থে ব্যবহৃত হওয়াকে কী বলে?",
+    "options": [
+      "অর্থের উন্নতি",
+      "অর্থের অবনতি",
+      "অর্থপ্রসার",
+      "অর্থসংকোচ"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 21,
+    "question": "'জেঠামি' শব্দটি কেন নেতিবাচক অর্থ লাভ করেছে?",
+    "options": [
+      "এটি জেঠার ভাব বোঝাতে ব্যবহৃত হয়",
+      "এটি 'পাকামি' অর্থে ব্যবহৃত হয়",
+      "এটি সম্মানিত বোঝাতে ব্যবহৃত হয়",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 22,
+    "question": "কোন শব্দটি বাংলাদেশে নেতিবাচক অর্থ লাভ করেছে?",
+    "options": [
+      "রাজাকার",
+      "জেঠামি",
+      "দ্বন্দ্ব",
+      "পাষণ্ড"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 23,
+    "question": "যখন শব্দের মূল অর্থ উদ্‌ঘাটন করা কঠিন হয়ে পড়ে, তখন কী ঘটে?",
+    "options": [
+      "অর্থসংকোচ",
+      "অর্থপ্রসার",
+      "অর্থ-বদল",
+      "অর্থের উন্নতি"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 24,
+    "question": "'পাষণ্ড' শব্দের মূল অর্থ কী ছিল?",
+    "options": [
+      "ধর্মদ্রোহী",
+      "উৎপীড়ক",
+      "নিষ্ঠুর",
+      "ধর্মসম্প্রদায়"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 25,
+    "question": "'গবাক্ষ' শব্দের ব্যুৎপত্তিগত অর্থ কী?",
+    "options": [
+      "জানালা",
+      "গরুর চোখ",
+      "আকাশ",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 26,
+    "question": "বাক্যে প্রয়োগভেদে শব্দের কী তৈরি হতে পারে?",
+    "options": [
+      "কোনো পরিবর্তন হয় না",
+      "অর্থ-বৈচিত্র্য",
+      "বাচ্যার্থ",
+      "লক্ষ্যার্থ"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 27,
+    "question": "'সে মাথায় আঘাত পেয়েছে।' — এখানে 'মাথা' শব্দের অর্থ কী?",
+    "options": [
+      "শরীরের ঊর্ধ্বাঙ্গ",
+      "গ্রামের নেতা",
+      "রাস্তার শেষ",
+      "কোনোটিই নয়"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 28,
+    "question": "'তিনি আমাদের গ্রামের মাথা।' — এখানে 'মাথা' শব্দের অর্থ কী?",
+    "options": [
+      "শরীরের ঊর্ধ্বাঙ্গ",
+      "গ্রামের নেতা",
+      "রাস্তার শেষ",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 29,
+    "question": "'সে রাস্তার মাথায় অপেক্ষা করছে।' — এখানে 'মাথা' শব্দের অর্থ কী?",
+    "options": [
+      "শরীরের ঊর্ধ্বাঙ্গ",
+      "গ্রামের নেতা",
+      "রাস্তার শেষ",
+      "কোনোটিই নয়"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 30,
+    "question": "'আদর দিয়ে দিয়ে ছেলেটাকে মাথায় তুলেছ।' — এখানে 'মাথায় তোলা' শব্দগুচ্ছটি কোন অর্থ প্রকাশ করছে?",
+    "options": [
+      "শরীরের ওপর রাখা",
+      "অতিরিক্ত প্রশ্রয় দেওয়া",
+      "নেতা বানানো",
+      "সম্মান দেওয়া"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 31,
+    "question": "'সে আমাদের রক্ষাকর্তা।' — এই বাক্যে কীসের কারণে ভিন্ন অর্থ উৎপাদন হতে পারে?",
+    "options": [
+      "শব্দের গাঠনিক অর্থ",
+      "বাকভঙ্গি",
+      "অভিধান",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 32,
+    "question": "'বাগর্থ' কী?",
+    "options": [
+      "বাক্যে ব্যবহৃত শব্দ",
+      "শব্দ ও শব্দগুচ্ছের অর্থ",
+      "ভাষার ব্যবহার",
+      "মনের ভাব প্রকাশ"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 33,
+    "question": "অভিধানে কোন ধরনের অর্থ প্রাধান্য পায়?",
+    "options": [
+      "লক্ষ্যার্থ",
+      "গৌণার্থ",
+      "লাক্ষণিক অর্থ",
+      "আক্ষরিক অর্থ"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 34,
+    "question": "'লক্ষ্যার্থ' এর অপর নাম কী?",
+    "options": [
+      "বাচ্যার্থ",
+      "গৌণার্থ",
+      "মুখ্য অর্থ",
+      "আক্ষরিক অর্থ"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 35,
+    "question": "'অঞ্চল' শব্দের অর্থ কেন প্রসারিত হয়েছে?",
+    "options": [
+      "এর মূল অর্থ শাড়ির পাড়",
+      "এটি এখন এলাকা অর্থেও ব্যবহৃত হয়",
+      "এটি একটি সাধারণ শব্দ",
+      "এটি একটি বিদেশি শব্দ"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 36,
+    "question": "'মৃগ' শব্দের অর্থ কেন সংকুচিত হয়েছে?",
+    "options": [
+      "এর মূল অর্থ সকল পশু ছিল",
+      "এটি এখন কেবল হরিণ বোঝায়",
+      "এটি একটি বিশেষ শব্দ",
+      "ক এবং খ উভয়ই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 37,
+    "question": "'অপরূপ' শব্দের অর্থের উন্নতি কেন ঘটেছে?",
+    "options": [
+      "এটি এখন শ্রীহীনতা বোঝায়",
+      "এটি এখন অনির্বচনীয় সৌন্দর্য বোঝায়",
+      "এটি একটি বিদেশি শব্দ",
+      "এটি একটি সাধারণ শব্দ"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 38,
+    "question": "'দ্বন্দ্ব' শব্দের অর্থের অবনতি কেন ঘটেছে?",
+    "options": [
+      "এর মূল অর্থ মিলন ছিল",
+      "এর বর্তমান অর্থ বিরোধ",
+      "উভয়ই",
+      "কোনোটিই নয়"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 39,
+    "question": "'পাষণ্ড' শব্দের অর্থ পরিবর্তনকে কেন 'অর্থ-বদল' বলা হয়?",
+    "options": [
+      "কারণ এর মূল অর্থ প্রকাশ করা কঠিন হয়ে পড়েছে।",
+      "কারণ এর অর্থ খারাপ হয়ে গেছে।",
+      "কারণ এর অর্থ ভালো হয়ে গেছে।",
+      "কারণ এর অর্থ সংকুচিত হয়েছে।"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 40,
+    "question": "'গবাক্ষ' শব্দের অর্থ পরিবর্তনকে কেন 'অর্থ-বদল' বলা হয়?",
+    "options": [
+      "কারণ এর মূল অর্থ জানালা ছিল।",
+      "কারণ এর ব্যুৎপত্তিগত অর্থ গরুর চোখ।",
+      "কারণ এর অর্থ প্রসারিত হয়েছে।",
+      "কোনোটিই নয়।"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 41,
+    "question": "'মাথা' শব্দের অর্থ পরিবর্তন কিসের উপর নির্ভরশীল?",
+    "options": [
+      "অভিধান",
+      "ব্যুৎপত্তি",
+      "বাক্যের প্রেক্ষাপট",
+      "সবগুলি"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 42,
+    "question": "'সে আমাদের রক্ষাকর্তা।' — এই বাক্যের ভিন্ন অর্থ কিসের কারণে হতে পারে?",
+    "options": [
+      "শব্দ পরিবর্তন",
+      "যতিচিহ্ন পরিবর্তন",
+      "বাকভঙ্গি পরিবর্তন",
+      "কোনোটিই নয়"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 43,
+    "question": "শব্দের অর্থ পরিবর্তন কয় ধরনের হতে পারে?",
+    "options": [
+      "দুই",
+      "তিন",
+      "চার",
+      "পাঁচ"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 44,
+    "question": "'মৃগয়া' শব্দের অর্থ কী?",
+    "options": [
+      "পশুশিকার",
+      "পশুদের রাজা",
+      "হরিণ",
+      "কোনোটিই নয়"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 45,
+    "question": "'মৃগরাজ' শব্দের অর্থ কী?",
+    "options": [
+      "পশুশিকার",
+      "পশুদের রাজা",
+      "হরিণ",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 46,
+    "question": "'অন্ন' শব্দের বর্তমান অর্থ কী?",
+    "options": [
+      "যে-কোনো খাদ্য",
+      "মিষ্টান্ন",
+      "পলান্ন",
+      "ভাত"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 47,
+    "question": "'অঞ্চল' শব্দের বর্তমান অর্থ কী?",
+    "options": [
+      "শাড়ির পাড়",
+      "এলাকা",
+      "ক ও খ উভয়ই",
+      "কোনোটিই নয়"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 48,
+    "question": "'বর্ষ' শব্দের বর্তমান অর্থ কী?",
+    "options": [
+      "বর্ষাকাল",
+      "বছর",
+      "ছয় ঋতু",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 49,
+    "question": "'অপরূপ' শব্দের বর্তমান অর্থ কী?",
+    "options": [
+      "শ্রীহীনতা",
+      "অনির্বচনীয় সৌন্দর্য",
+      "রূপ",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 50,
+    "question": "'সাহস' শব্দের বর্তমান অর্থ কী?",
+    "options": [
+      "চুরি",
+      "ডাকাতি",
+      "নির্ভীকতা",
+      "কোনোটিই নয়"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 51,
+    "question": "'দ্বন্দ্ব' শব্দের বর্তমান অর্থ কী?",
+    "options": [
+      "মিলন",
+      "সমাস",
+      "বিরোধ",
+      "কোনোটিই নয়"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 52,
+    "question": "'জেঠামি' শব্দের বর্তমান অর্থ কী?",
+    "options": [
+      "সম্মানিত",
+      "পাকামি",
+      "জেঠা-সংশ্লিষ্ট",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 53,
+    "question": "'পাষণ্ড' শব্দের বর্তমান অর্থ কী?",
+    "options": [
+      "ধর্মসম্প্রদায়",
+      "ধর্মদ্রোহী উৎপীড়ক",
+      "নিষ্ঠুর",
+      "খ ও গ উভয়ই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 54,
+    "question": "'গবাক্ষ' শব্দের বর্তমান অর্থ কী?",
+    "options": [
+      "গরুর চোখ",
+      "জানালা",
+      "গোরু",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 55,
+    "question": "ভাষার স্বাভাবিক বিবর্তন প্রক্রিয়ায় শব্দের অর্থ কী হতে পারে?",
+    "options": [
+      "প্রসারিত",
+      "সংকুচিত",
+      "উন্নতি বা অবনতি",
+      "সবগুলি"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 56,
+    "question": "'অর্থ-বৈচিত্র্য' কী?",
+    "options": [
+      "শব্দের এক বা একাধিক অর্থ",
+      "শব্দের শুধু একটি অর্থ",
+      "শব্দের নির্দিষ্ট অর্থ",
+      "কোনোটিই নয়"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 57,
+    "question": "'বাকভঙ্গির কারণে অর্থ-ভিন্নতা' বলতে কী বোঝানো হয়েছে?",
+    "options": [
+      "শব্দের লিখিত রূপ",
+      "শব্দের উচ্চারণের ধরন",
+      "বাক্যের গঠন",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 58,
+    "question": "'অভিধান' কী?",
+    "options": [
+      "শব্দের বাচ্যার্থের ভাণ্ডার",
+      "শব্দের লক্ষ্যার্থের ভাণ্ডার",
+      "শব্দের বাগর্থের ভাণ্ডার",
+      "শব্দের অর্থের ভাণ্ডার"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 59,
+    "question": "'শব্দের গাঠনিক উপাদান' বলতে কী বোঝানো হয়েছে?",
+    "options": [
+      "শব্দের অক্ষর",
+      "শব্দের শব্দমূল",
+      "শব্দের উচ্চারণ",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 60,
+    "question": "'বাগর্থ' কোন দুটি বিষয়ের উপর ভিত্তি করে গঠিত হয়?",
+    "options": [
+      "শব্দ ও শব্দগুচ্ছ",
+      "বাচ্যার্থ ও লক্ষ্যার্থ",
+      "অভিধান ও বাকভঙ্গি",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 61,
+    "question": "'অর্থপ্রসার' এর উদাহরণ কোনটি?",
+    "options": [
+      "মৃগ",
+      "অঞ্চল",
+      "অপরূপ",
+      "পাষণ্ড"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 62,
+    "question": "'অর্থসংকোচ' এর উদাহরণ কোনটি?",
+    "options": [
+      "বর্ষ",
+      "অন্ন",
+      "সাহস",
+      "দ্বন্দ্ব"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 63,
+    "question": "'অর্থের উন্নতি' এর উদাহরণ কোনটি?",
+    "options": [
+      "মৃগ",
+      "অঞ্চল",
+      "অপরূপ",
+      "পাষণ্ড"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 64,
+    "question": "'অর্থের অবনতি' এর উদাহরণ কোনটি?",
+    "options": [
+      "বর্ষ",
+      "অন্ন",
+      "দ্বন্দ্ব",
+      "গবাক্ষ"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 65,
+    "question": "'অর্থ-বদল' এর উদাহরণ কোনটি?",
+    "options": [
+      "সাহস",
+      "অপরূপ",
+      "পাষণ্ড",
+      "অঞ্চল"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 66,
+    "question": "'অঞ্চল' শব্দের মূল অর্থ কী?",
+    "options": [
+      "এলাকা",
+      "শাড়ির পাড়",
+      "জেলা",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 67,
+    "question": "'মৃগ' শব্দের মূল অর্থ কী ছিল?",
+    "options": [
+      "হরিণ",
+      "পশু",
+      "সিংহ",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 68,
+    "question": "'অপরূপ' শব্দের মূল অর্থ কী ছিল?",
+    "options": [
+      "শ্রীহীনতা",
+      "অনির্বচনীয় সৌন্দর্য",
+      "রূপ",
+      "কোনোটিই নয়"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 69,
+    "question": "'সাহস' শব্দের মূল অর্থ কী ছিল?",
+    "options": [
+      "চুরি, ডাকাতি",
+      "নির্ভীকতা",
+      "উদ্যম",
+      "কোনোটিই নয়"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 70,
+    "question": "'দ্বন্দ্ব' শব্দের মূল অর্থ কী ছিল?",
+    "options": [
+      "বিরোধ",
+      "মিলন",
+      "যুদ্ধ",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 71,
+    "question": "'পাষণ্ড' শব্দের মূল অর্থ কী ছিল?",
+    "options": [
+      "ধর্মদ্রোহী",
+      "উৎপীড়ক",
+      "ধর্মসম্প্রদায়",
+      "কোনোটিই নয়"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 72,
+    "question": "'গবাক্ষ' শব্দের মূল অর্থ কী ছিল?",
+    "options": [
+      "জানালা",
+      "গরুর চোখ",
+      "আকাশ",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 73,
+    "question": "'মাথা' শব্দের উদাহরণগুলো কেন দেওয়া হয়েছে?",
+    "options": [
+      "বাচ্যার্থ বোঝানোর জন্য",
+      "লক্ষ্যার্থ বোঝানোর জন্য",
+      "বাক্যে অর্থ পরিবর্তনের ধরন বোঝানোর জন্য",
+      "কোনোটিই নয়"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 74,
+    "question": "'সে আমাদের রক্ষাকর্তা।' — এই বাক্যের উদাহরণ কেন দেওয়া হয়েছে?",
+    "options": [
+      "অর্থের উন্নতি বোঝানোর জন্য",
+      "অর্থের অবনতি বোঝানোর জন্য",
+      "বাকভঙ্গির কারণে অর্থ-ভিন্নতা বোঝানোর জন্য",
+      "কোনোটিই নয়"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 75,
+    "question": "'অর্থের শ্রেণিবিভাগ' বলতে কী বোঝানো হয়েছে?",
+    "options": [
+      "শব্দের অর্থ কত প্রকার ও কী কী",
+      "শব্দের অর্থের পরিবর্তন",
+      "শব্দের অর্থের মূল",
+      "কোনোটিই নয়"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 76,
+    "question": "'শব্দের অর্থ পরিবর্তন' বলতে কী বোঝানো হয়েছে?",
+    "options": [
+      "সময়ের সঙ্গে শব্দের অর্থের পরিবর্তন",
+      "অভিধানে শব্দের অর্থ পরিবর্তন",
+      "শব্দের অর্থ এক শব্দ থেকে অন্য শব্দে পরিবর্তন",
+      "কোনোটিই নয়"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 77,
+    "question": "'বাচ্যার্থ' এবং 'লক্ষ্যার্থ' এর মধ্যে প্রধান পার্থক্য কী?",
+    "options": [
+      "বাচ্যার্থ অভিধানে পাওয়া যায়, লক্ষ্যার্থ অভিধানে পাওয়া যায় না।",
+      "বাচ্যার্থ মুখ্য অর্থ, লক্ষ্যার্থ গৌণার্থ।",
+      "বাচ্যার্থ আক্ষরিক অর্থ, লক্ষ্যার্থ লাক্ষণিক অর্থ।",
+      "সবগুলি"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 78,
+    "question": "'অর্থপ্রসার' এবং 'অর্থসংকোচ' এর মধ্যে প্রধান পার্থক্য কী?",
+    "options": [
+      "অর্থপ্রসার শব্দের অর্থের ব্যাপ্তি বাড়ায়, অর্থসংকোচ কমায়।",
+      "অর্থপ্রসার শব্দের অর্থের অবনতি ঘটায়, অর্থসংকোচ উন্নতি ঘটায়।",
+      "উভয়ই একই ধরনের পরিবর্তন।",
+      "কোনোটিই নয়।"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 79,
+    "question": "'অর্থের উন্নতি' এবং 'অর্থের অবনতি' এর মধ্যে প্রধান পার্থক্য কী?",
+    "options": [
+      "অর্থের উন্নতি নেতিবাচক থেকে ইতিবাচক অর্থ ধারণ করে, অবনতি ইতিবাচক থেকে নেতিবাচক।",
+      "অর্থের উন্নতি অর্থের ব্যাপ্তি বাড়ায়, অবনতি কমায়।",
+      "উভয়ই শব্দের অর্থের পরিবর্তন ঘটায়।",
+      "কোনোটিই নয়।"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 80,
+    "question": "'অর্থ-বদল' এবং অন্যান্য অর্থ পরিবর্তনের মধ্যে প্রধান পার্থক্য কী?",
+    "options": [
+      "অর্থ-বদলে শব্দের মূল অর্থ চেনা কঠিন হয়ে পড়ে।",
+      "অর্থ-বদলে শব্দের অর্থ প্রসারিত হয়।",
+      "অর্থ-বদলে শব্দের অর্থ সংকুচিত হয়।",
+      "কোনোটিই নয়।"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 81,
+    "question": "'অঞ্চল' শব্দের অর্থপ্রসার কীভাবে ঘটেছে?",
+    "options": [
+      "শুধু শাড়ির পাড় থেকে শুধু এলাকা।",
+      "শুধু শাড়ির পাড় থেকে শাড়ির পাড় ও এলাকা উভয়ই।",
+      "শুধু এলাকা থেকে শুধু শাড়ির পাড়।",
+      "কোনোটিই নয়।"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 82,
+    "question": "'বর্ষ' শব্দের অর্থপ্রসার কীভাবে ঘটেছে?",
+    "options": [
+      "শুধু বর্ষাকাল থেকে শুধু বছর।",
+      "শুধু বর্ষাকাল থেকে বর্ষাকাল ও বছর উভয়ই।",
+      "শুধু বছর থেকে শুধু বর্ষাকাল।",
+      "কোনোটিই নয়।"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 83,
+    "question": "'মৃগ' শব্দের অর্থসংকোচ কীভাবে ঘটেছে?",
+    "options": [
+      "সকল পশু থেকে হরিণ।",
+      "হরিণ থেকে সকল পশু।",
+      "হরিণ থেকে পশুশিকার।",
+      "কোনোটিই নয়।"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 84,
+    "question": "'অন্ন' শব্দের অর্থসংকোচ কীভাবে ঘটেছে?",
+    "options": [
+      "যে-কোনো খাদ্য থেকে শুধু ভাত।",
+      "শুধু ভাত থেকে যে-কোনো খাদ্য।",
+      "যে-কোনো খাদ্য থেকে শুধু মিষ্টান্ন।",
+      "কোনোটিই নয়।"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 85,
+    "question": "'অপরূপ' শব্দের অর্থের উন্নতি কীভাবে ঘটেছে?",
+    "options": [
+      "অনির্বচনীয় সৌন্দর্য থেকে শ্রীহীনতা।",
+      "শ্রীহীনতা থেকে অনির্বচনীয় সৌন্দর্য।",
+      "রূপ থেকে অপরূপ।",
+      "কোনোটিই নয়।"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 86,
+    "question": "'সাহস' শব্দের অর্থের উন্নতি কীভাবে ঘটেছে?",
+    "options": [
+      "নির্ভীকতা থেকে চুরি।",
+      "চুরি থেকে নির্ভীকতা।",
+      "চুরি থেকে ডাকাতি।",
+      "কোনোটিই নয়।"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 87,
+    "question": "'দ্বন্দ্ব' শব্দের অর্থের অবনতি কীভাবে ঘটেছে?",
+    "options": [
+      "বিরোধ থেকে মিলন।",
+      "মিলন থেকে বিরোধ।",
+      "বিরোধ থেকে সমাস।",
+      "কোনোটিই নয়।"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 88,
+    "question": "'জেঠামি' শব্দের অর্থের অবনতি কীভাবে ঘটেছে?",
+    "options": [
+      "সম্মানিত অর্থ থেকে পাকামি।",
+      "পাকামি থেকে সম্মানিত।",
+      "জেঠা-সংশ্লিষ্ট থেকে পাকামি।",
+      "ক এবং গ উভয়ই"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 89,
+    "question": "'পাষণ্ড' শব্দের অর্থ-বদল কীভাবে ঘটেছে?",
+    "options": [
+      "ধর্মসম্প্রদায় থেকে ধর্মদ্রোহী উৎপীড়ক।",
+      "ধর্মদ্রোহী উৎপীড়ক থেকে ধর্মসম্প্রদায়।",
+      "নিষ্ঠুর থেকে ধর্মদ্রোহী।",
+      "কোনোটিই নয়।"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 90,
+    "question": "'গবাক্ষ' শব্দের অর্থ-বদল কীভাবে ঘটেছে?",
+    "options": [
+      "জানালা থেকে গরুর চোখ।",
+      "গরুর চোখ থেকে জানালা।",
+      "গরুর চোখ থেকে গোয়াল।",
+      "কোনোটিই নয়।"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 91,
+    "question": "'সে মাথায় আঘাত পেয়েছে।' — এই বাক্যে 'মাথা' শব্দের কোন অর্থ ব্যবহৃত হয়েছে?",
+    "options": [
+      "বাচ্যার্থ",
+      "লক্ষ্যার্থ",
+      "গৌণার্থ",
+      "লাক্ষণিক অর্থ"
+    ],
+    "answer": 0
+  },
+  {
+    "id": 92,
+    "question": "'তিনি আমাদের গ্রামের মাথা।' — এই বাক্যে 'মাথা' শব্দের কোন অর্থ ব্যবহৃত হয়েছে?",
+    "options": [
+      "বাচ্যার্থ",
+      "লক্ষ্যার্থ",
+      "মুখ্য অর্থ",
+      "আক্ষরিক অর্থ"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 93,
+    "question": "'লক্ষ্যার্থ' এর মূল ভিত্তি কী?",
+    "options": [
+      "অভিধান",
+      "বাচ্যার্থ",
+      "শব্দমূল",
+      "বাক্য"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 94,
+    "question": "'বাচ্যার্থ' এর মূল ভিত্তি কী?",
+    "options": [
+      "অভিধান",
+      "লক্ষ্যার্থ",
+      "শব্দমূল",
+      "বাক্য"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 95,
+    "question": "'আক্ষরিক অর্থ' কাকে বলা হয়?",
+    "options": [
+      "লক্ষ্যার্থকে",
+      "বাচ্যার্থকে",
+      "বাগর্থকে",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 96,
+    "question": "'গৌণার্থ' কাকে বলা হয়?",
+    "options": [
+      "বাচ্যার্থকে",
+      "লক্ষ্যার্থকে",
+      "বাগর্থকে",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 97,
+    "question": "'লাক্ষণিক অর্থ' কাকে বলা হয়?",
+    "options": [
+      "বাচ্যার্থকে",
+      "লক্ষ্যার্থকে",
+      "বাগর্থকে",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 98,
+    "question": "'অর্থপ্রসার', 'অর্থসংকোচ', 'অর্থের উন্নতি', 'অর্থের অবনতি' এবং 'অর্থ-বদল' — এই পাঁচটি প্রক্রিয়া কিসের অংশ?",
+    "options": [
+      "অর্থের শ্রেণিবিভাগ",
+      "শব্দের অর্থ পরিবর্তন",
+      "বাক্যে অর্থ পরিবর্তন",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 99,
+    "question": "'বাগর্থ' কোন দুটি বিষয়ের মধ্যে সংযোগ ঘটায়?",
+    "options": [
+      "শব্দ ও শব্দগুচ্ছ",
+      "বক্তা ও শ্রোতা",
+      "বাচ্যার্থ ও লক্ষ্যার্থ",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 100,
+    "question": "'সে আমাদের রক্ষাকর্তা।' — এই বাক্যের ভিন্ন অর্থ কীভাবে বুঝা যায়?",
+    "options": [
+      "লিখিতভাবে",
+      "বাকভঙ্গির মাধ্যমে",
+      "শব্দ পরিবর্তন করে",
+      "কোনোটিই নয়"
+    ],
+    "answer": 1
+  }
+];
+
+let currentQuestion = 0;
+let score = 0;
+let wrongAnswers = [];
+let timer;
+let timeLeft = 30;
+let paused = false;
+
+const questionEl = document.getElementById("question");
+const optionsEl = document.getElementById("options");
+const progressBar = document.getElementById("progress-bar");
+const timerBar = document.getElementById("timer-bar");
+const scoreEl = document.getElementById("score");
+const currentQuestionEl = document.getElementById("current-question");
+const totalQuestionsEl = document.getElementById("total-questions");
+const quizContainer = document.getElementById("quiz-container");
+const startScreen = document.getElementById("start-screen");
+const resultScreen = document.getElementById("result-screen");
+const finalScore = document.getElementById("final-score");
+const wrongSummary = document.getElementById("wrong-summary");
+
+totalQuestionsEl.innerText = quizData.length;
+
+function startQuiz() {
+    startScreen.style.display = "none";
+    quizContainer.style.display = "block";
+    currentQuestion = 0;
+    score = 0;
+    wrongAnswers = [];
+    updateScore();
+    showQuestion();
+    openFullscreen();
+}
+
+function showQuestion() {
+    if (currentQuestion >= quizData.length) {
+        endQuiz();
+        return;
+    }
+
+    timeLeft = 30;
+    updateTimer();
+    startTimer();
+
+    const q = quizData[currentQuestion];
+    questionEl.innerText = `${q.id}. ${q.question}`; // Show serial from JSON
+    adjustFontSize(questionEl, q.question, 6);
+
+    optionsEl.innerHTML = "";
+    q.options.forEach((option, index) => {
+        const btn = document.createElement("div");
+        btn.classList.add("option");
+        btn.innerText = option;
+        adjustFontSize(btn, option, 4);
+        btn.addEventListener("click", () => selectAnswer(index));
+        optionsEl.appendChild(btn);
+    });
+
+    currentQuestionEl.innerText = currentQuestion + 1;
+    progressBar.style.width = ((currentQuestion / quizData.length) * 100) + "%";
+}
+
+// Dynamic font adjustment
+function adjustFontSize(el, text, maxSize) {
+    let size = maxSize - Math.floor(text.length / 25);
+    if (size < 3) size = 3;
+    el.style.fontSize = size + "vw";
+}
+
+function selectAnswer(index) {
+    stopTimer();
+    const q = quizData[currentQuestion];
+    const optionEls = document.querySelectorAll(".option");
+
+    if (index === q.answer) {
+        optionEls[index].classList.add("correct");
+        score++;
+    } else {
+        optionEls[index].classList.add("wrong");
+        optionEls[q.answer].classList.add("correct");
+        wrongAnswers.push(q);
+    }
+
+    updateScore();
+    setTimeout(() => {
+        currentQuestion++;
+        showQuestion();
+    }, 1000);
+}
+
+function updateScore() { scoreEl.innerText = `Score: ${score}`; }
+
+function startTimer() {
+    timerBar.style.width = "100%";
+    timer = setInterval(() => {
+        if (!paused) {
+            timeLeft--;
+            timerBar.style.width = (timeLeft / 30 * 100) + "%";
+            if (timeLeft <= 0) {
+                stopTimer();
+                wrongAnswers.push(quizData[currentQuestion]);
+                currentQuestion++;
+                showQuestion();
+            }
+        }
+    }, 1000);
+}
+
+function stopTimer() { clearInterval(timer); }
+function updateTimer() { timerBar.style.width = "100%"; }
+function pauseQuiz() { paused = true; }
+function resumeQuiz() { paused = false; }
+function stopQuiz() { stopTimer(); endQuiz(); }
+
+function endQuiz() {
+    quizContainer.style.display = "none";
+    resultScreen.style.display = "flex";
+    finalScore.innerText = `${score} / ${quizData.length}`;
+    if(wrongAnswers.length > 0){
+        wrongSummary.innerText = `Wrong Answers: ${wrongAnswers.length} / ${quizData.length}`;
+    } else {
+        wrongSummary.innerText = "";
+    }
+}
+
+function restartQuiz() {
+    resultScreen.style.display = "none";
+    startScreen.style.display = "flex";
+}
+
+function retryWrong() {
+    if (wrongAnswers.length === 0) return;
+    quizData.splice(0, quizData.length, ...wrongAnswers);
+    resultScreen.style.display = "none";
+    quizContainer.style.display = "block";
+    currentQuestion = 0;
+    score = 0;
+    wrongAnswers = [];
+    updateScore();
+    showQuestion();
+}
+
+function openFullscreen() {
+    const elem = document.documentElement;
+    if (elem.requestFullscreen) { elem.requestFullscreen(); }
+    else if (elem.webkitRequestFullscreen) { elem.webkitRequestFullscreen(); }
+    else if (elem.msRequestFullscreen) { elem.msRequestFullscreen(); }
+}
+</script>
+
+</body>
+</html>
